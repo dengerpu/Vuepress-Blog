@@ -27,7 +27,7 @@ jobs:
       - name: install dep
         run: npm install # 任务运行的命令
       - name: build app
-        run: npm run build
+        run: npm run buildLinux
       - name: copy file via ssh password #上传打包后的文件到服务器
         uses: appleboy/scp-action@master
         with:

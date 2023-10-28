@@ -4,6 +4,7 @@
   "scripts": {
     "dev": "set NODE_OPTIONS=--openssl-legacy-provider && node --max_old_space_size=102400 ./node_modules/vuepress/cli.js dev docs",
     "build": "set NODE_OPTIONS=--openssl-legacy-provider && node --max_old_space_size=102400 ./node_modules/vuepress/cli.js build docs",
+    "buildLinux": "export NODE_OPTIONS=--openssl-legacy-provider && node --max_old_space_size=102400 ./node_modules/vuepress/cli.js build docs",
     "predev": "vdoing",
     "prebuild": "vdoing",
     "deploy": "bash deploy.sh",

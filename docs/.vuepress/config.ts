@@ -35,67 +35,107 @@ export default defineConfig4CustomTheme<VdoingThemeConfig>({
         items: [
           // 说明：以下所有link的值只是在相应md文件头部定义的永久链接（不是什么特殊编码）。另外，注意结尾是有斜杠的
           {
-            text: '前端文章',
+            text: '《Vue学习笔记》',
             items: [
-              { text: 'JavaScript', link: '/pages/8143cc480faf9a11/' },
+              { text: 'Vue2', link: '/pages/057633/' },
+              { text: 'Vue2源码', link: '/pages/96e87f/' },
+              { text: 'Vue3', link: '/pages/a34803/' },
+              { text: '玩转Vue3全家桶', link: '/pages/2b6fd3/' },
             ],
           },
           {
-            text: '学习笔记',
+            text: '《其他笔记》',
             items: [
-              { text: '《JavaScript教程》', link: '/note/javascript/' },
-              { text: '《JavaScript高级程序设计》', link: '/note/js/' },
-              { text: '《ES6 教程》', link: '/note/es6/' },
-              { text: '《Vue》', link: '/note/vue/' },
-              { text: '《React》', link: '/note/react/' },
-              {
-                text: '《TypeScript 从零实现 axios》',
-                link: '/note/typescript-axios/',
-              },
-              {
-                text: '《Git》',
-                link: '/note/git/',
-              },
-              {
-                text: 'TypeScript',
-                link: '/pages/51afd6/',
-              },
-              {
-                text: 'JS设计模式总结',
-                link: '/pages/4643cd/',
-              },
+              { text: 'JavaScript高级程序设计', link: '/pages/a3d3ed/' },
+              { text: 'TypeScript', link: '/pages/19ef6f/' },
+              { text: 'webpack5',link: '/pages/81fb35/' },
+              { text: 'Node', link: '/pages/f39f78/' },
+              { text: '服务端渲染Nuxt.js',link: '/pages/bc41f0/'}
             ],
           },
         ],
       },
       {
-        text: '页面',
-        link: '/ui/',
+        text: '后端',
+        link: '/backend/',
         items: [
-          { text: 'HTML', link: '/pages/8309a5b876fc95e3/' },
-          { text: 'CSS', link: '/pages/0a83b083bdf257cb/' },
+          { text: 'Java基础', link: '/pages/a598af/' },
+          { text: 'Spring', link: '/pages/5a1dfe/' },
+          { text: 'SpringMVC', link: '/pages/44331a/' },
+          { text: 'Mybatis', link: '/pages/9c8a8c/' },
+          { text: 'MyBatisPlus', link: '/pages/ef4392/' },
+          { text: 'SpringBoot', link: '/pages/b181d7/' },
+          { text: 'SpringSecurity', link: '/pages/c01b67/' },
+          { text: 'Swagger', link: '/pages/c37442/' },
+          { text: 'RabbitMQ', link: '/pages/c8bebf/' },
+          { text: 'SpringCloud', link: '/pages/8ab128/' },
         ],
       },
       {
-        text: '技术',
-        link: '/technology/',
+        text: '数据库',
+        link: '/sql/',
         items: [
-          { text: '技术文档', link: '/pages/9a7ee40fc232253e/' },
-          { text: 'GitHub技巧', link: '/pages/4c778760be26d8b3/' },
-          { text: 'Nodejs', link: '/pages/117708e0af7f0bd9/' },
-          { text: '博客搭建', link: '/pages/41f87d890d0a02af/' },
+          { text: 'MySQL', link: '/pages/852656/' },
+          { text: 'Redis', link: '/pages/a5d849/' }
         ],
       },
       {
-        text: '更多',
-        link: '/more/',
+        text: '算法',
+        link: '/algorithm/',
         items: [
-          { text: '学习', link: '/pages/f2a556/' },
-          { text: '面试', link: '/pages/aea6571b7a8bae86/' },
-          { text: '心情杂货', link: '/pages/2d615df9a36a98ed/' },
-          { text: '实用技巧', link: '/pages/baaa02/' },
-          { text: '友情链接', link: '/friends/' },
+          { text: 'HTML/CSS牛客刷题', link: '/pages/d3f456/' },
+          { text: 'js牛客刷题', link: '/pages/c69ee5/' },
+          { text: '剑指offer-牛客', link: '/pages/0ed727/' },
+          { text: '面试手撕题js', link: '/pages/27e419/' },
+          { text: '力扣刷题', link: '/pages/ae523d/' },
+          { text: 'AcWing刷题', link: '/pages/0518f2/' },
         ],
+      },
+      {
+        text: '项目实战',
+        link: '/item/',
+        items: [
+          { text: '大屏', link: '/pages/409542/' },
+          { text: 'SpringBoot项目', link: '/pages/e9b2d2/' },
+          { text: 'Vue项目实战', link: '/pages/f28741/' },
+          { text: '从0搭建后台管理系统(Vue2)', link: '/pages/a84d22/' },
+          { text: 'Vue3项目实战', link: '/pages/8a69d5/' },
+          { text: '博客项目实战', link: '/pages/9decd4/' }
+        ],
+      },
+      {
+        text: '扩展',
+        link: '/extend/',
+        items: [
+          { text: 'Git', link: '/pages/449d74/' },
+          {
+            text: '《博客》',
+            items: [
+              { text: 'hexo博客搭建', link: '/pages/6481f9/' },
+              { text: 'Docsify', link: '/pages/1ac4c8/' },
+              { text: 'VuePress', link: '/pages/345815/' },
+            ],
+          },
+          {
+            text: '《Linux》',
+            items: [
+              { text: 'Linux', link: '/pages/b89721/' },
+              { text: '服务器配置', link: '/pages/e28d74/' },
+            ],
+          },
+          {
+            text: '《计算机网络》',
+            items: [
+              { text: '计算机网络', link: '/pages/ed2ea5/' },
+            ],
+          },
+        ],
+      },
+      {
+        text: '前端小课程',link: '/course/',
+        items: [
+          { text: '柯里化', link: '/pages/101b26/' }
+        ]
       },
       { text: '关于', link: '/about/' },
       {

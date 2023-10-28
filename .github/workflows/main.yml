@@ -27,7 +27,7 @@ jobs:
       - name: install dep
         run: npm install # 任务运行的命令
       - name: build app
-        run: set NODE_OPTIONS=--openssl-legacy-provider && node --max_old_space_size=102400 ./node_modules/vuepress/cli.js build docs
+        run: npm run build
       - name: copy file via ssh password #上传打包后的文件到服务器
         uses: appleboy/scp-action@master
         with:

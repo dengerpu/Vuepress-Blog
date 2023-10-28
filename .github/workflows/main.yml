@@ -19,13 +19,13 @@ jobs:
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      # - uses: actions/checkout@v2
-      # - name: install Node.js # 任务的名字，可任意
-      #   uses: actions/setup-node@v2.5.0 # 可以在右边搜
-      #   with:
-      #     node-version: "14.X" # 版本
-      # - name: install dep
-      #   run: npm install # 任务运行的命令
+      - uses: actions/checkout@v2
+      - name: install Node.js # 任务的名字，可任意
+        uses: actions/setup-node@v2.5.0 # 可以在右边搜
+        with:
+          node-version: "18.18.0" # 版本
+      - name: install dep
+        run: npm install # 任务运行的命令
       - name: build app
         run: npm run build
       - name: copy file via ssh password #上传打包后的文件到服务器

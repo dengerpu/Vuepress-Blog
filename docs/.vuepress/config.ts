@@ -69,26 +69,13 @@ export default defineConfig4CustomTheme<VdoingThemeConfig>({
           { text: 'Swagger', link: '/pages/c37442/' },
           { text: 'RabbitMQ', link: '/pages/c8bebf/' },
           { text: 'SpringCloud', link: '/pages/8ab128/' },
-        ],
-      },
-      {
-        text: '数据库',
-        link: '/sql/',
-        items: [
-          { text: 'MySQL', link: '/pages/852656/' },
-          { text: 'Redis', link: '/pages/a5d849/' }
-        ],
-      },
-      {
-        text: '算法',
-        link: '/algorithm/',
-        items: [
-          { text: 'HTML/CSS牛客刷题', link: '/pages/d3f456/' },
-          { text: 'js牛客刷题', link: '/pages/c69ee5/' },
-          { text: '剑指offer-牛客', link: '/pages/0ed727/' },
-          { text: '面试手撕题js', link: '/pages/27e419/' },
-          { text: '力扣刷题', link: '/pages/ae523d/' },
-          { text: 'AcWing刷题', link: '/pages/0518f2/' },
+          {
+            text: '《数据库》',
+            items: [
+              { text: 'MySQL', link: '/pages/852656/' },
+              { text: 'Redis', link: '/pages/a5d849/' }
+            ],
+          },
         ],
       },
       {
@@ -107,6 +94,17 @@ export default defineConfig4CustomTheme<VdoingThemeConfig>({
         text: '扩展',
         link: '/extend/',
         items: [
+          {
+            text: '算法',
+            items: [
+              { text: 'HTML/CSS牛客刷题', link: '/pages/d3f456/' },
+              { text: 'js牛客刷题', link: '/pages/c69ee5/' },
+              { text: '剑指offer-牛客', link: '/pages/0ed727/' },
+              { text: '面试手撕题js', link: '/pages/27e419/' },
+              { text: '力扣刷题', link: '/pages/ae523d/' },
+              { text: 'AcWing刷题', link: '/pages/0518f2/' },
+            ],
+          },
           { text: 'Git', link: '/pages/449d74/' },
           {
             text: '《博客》',
@@ -132,7 +130,7 @@ export default defineConfig4CustomTheme<VdoingThemeConfig>({
         ],
       },
       {
-        text: '前端小课程',link: '/course/',
+        text: '📖前端小课程',link: '/course/',
         items: [
           { text: '柯里化', link: '/pages/101b26/' }
         ]
@@ -146,6 +144,17 @@ export default defineConfig4CustomTheme<VdoingThemeConfig>({
         //   { text: '资源', link: '/pages/eee83a9211a70f9d/' },
         //   { text: 'Vue资源', link: '/pages/12df8ace52d493f6/' },
         // ],
+      },
+      {
+        text: '更多',
+        link: '/more/',
+        items: [
+          { text: '学习', link: '/pages/f2a556/' },
+          { text: '面试', link: '/pages/aea6571b7a8bae86/' },
+          { text: '心情杂货', link: '/pages/2d615df9a36a98ed/' },
+          { text: '实用技巧', link: '/pages/baaa02/' },
+          { text: '友情链接', link: '/friends/' },
+        ],
       },
       {
         text: '索引',

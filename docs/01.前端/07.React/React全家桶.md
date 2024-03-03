@@ -1,12 +1,16 @@
+---
 title: React全家桶
-index_img: /img/article/empty.png
-categories:
-
-  - 分类
-tags:
-  - 标签1
-  - 标签2
 date: 2023-11-19 16:25:55
+permalink: /pages/e6b5ef/
+categories:
+  - 前端
+  - React
+tags:
+  - 
+author: 
+  name: 爱写bug的小邓程序员
+  link: https://github.com/dengerpu
+---
 
 [React官网](https://zh-hans.react.dev/learn)
 
@@ -146,7 +150,7 @@ html, body {
 
 在index.js中引入
 
-```javascript
+```jsx
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import "./index.less"
@@ -420,7 +424,7 @@ import 'react-app-polyfill/stable';
 
 ### React数据驱动格式
 
-```react
+```jsx
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import "@/index.less"
@@ -524,15 +528,19 @@ Vue框架采用的是NVVM体系:
 
    ​    => 但是如果是JSX的虚拟DOM对象，是直接可以渲染的
 
-4. 设置行内样式，必须是 `style={{color:'red'...}}；`
+4. 设置行内样式，必须是 
 
-   ​     设置样式类名需要使用的是`className`；
+   ```jsx
+   style={{color:'red'...}};
+   ```
+
+   ​     设置样式类名需要使用的是`className`
 
 5. JSX中进行的判断一般都要基于**三元运算符**来完成
 
-6.  JSX中遍历数组中的每一项，动态绑定多个JSX元素，一般都是基于数组中的map来实现的
+6. JSX中遍历数组中的每一项，动态绑定多个JSX元素，一般都是基于数组中的map来实现的
 
-     =>和vue一样，循环绑定的元素要设置key值（作用：用于DOM-DIFF差异化对比）
+    =>和vue一样，循环绑定的元素要设置key值（作用：用于DOM-DIFF差异化对比）
 
  JSX语法具备过滤效果（过滤非法内容），有效防止XSS攻击（扩展思考：总结常见的XSS攻击和预防方案？）
 
@@ -565,7 +573,7 @@ Vue框架采用的是NVVM体系:
 + 数组对象:把数组的每一项都分别拿出来渲染「并不是变为字符串渲染，中间没有逗号」
 + 函数对象:不支持在身中渲染，但是可以作为函数组件，用`<Component/>`方式渲染!!
 
-```react
+```jsx
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 
@@ -595,7 +603,7 @@ root.render(
 
 * 设置样式类名: 需要把class替换为className
 
-```react
+```jsx
     <h2 className='abc' style={{
       color: 'red', 
       fontSize: '24px' // 样式属性要用驼峰命名法
@@ -608,7 +616,7 @@ root.render(
 
 #### 判断元素的显示与隐藏
 
-```react
+```jsx
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 
@@ -631,7 +639,7 @@ root.render(
 
 #### 数组循环创建元素
 
-```react
+```jsx
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 
@@ -717,7 +725,7 @@ root.render(
 
 真实DOM: 浏览器页面中，最后渲染出来，让用户看见的DOM元素! !
 
-```react
+```jsx
 // v16
 ReactDOM.render(
     <>...</>,
@@ -743,7 +751,7 @@ root.render(
 
 源代码
 
-```react
+```jsx
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 
@@ -1020,7 +1028,9 @@ root.render(
 
 > 调用组件的时候，我们可以给调用的组件设置(传递)各种各样的属性
 >
-> `<DemoOne title="我是标题"x={10} data={[100,200]} className="box" style={{ fontSize: '20px'}}/>`
+> ```jsx
+> <DemoOne title="我是标题"x={10} data={[100,200]} className="box" style={{ fontSize: '20px'}}/>
+> ```
 >
 > 如果设置的属性值**不是字符串格式**，需要基于{}“胡子语法"进行嵌套
 
@@ -1241,14 +1251,17 @@ console.log(obj);
 > 如果组件上面也传递了chidren属性，并且组件内部也传递了children，组件内部传递的数据会覆盖组件上面传递的
 >
 > ```jsx
->     <FunComponent title="我是标题" children={[100,200]} x={10} y="10" z={122} data={[100,200]} className="box" style={{ fontSize: '20px'}}>
->       <span style={{color: "red"}}>1111</span>
->     </FunComponent>
+>  <FunComponent title="我是标题" children={[100,200]} x={10} y="10" z={122} data={[100,200]} className="box" style={{ fontSize: '20px'}}>
+>    <span style={{color: "red"}}>1111</span>
+>  </FunComponent>
 > ```
 >
 > ![image-20231208215634847](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202312082156967.png)
 >
-> 如果注释掉`<span style={{color: "red"}}>1111</span>`，则children输出为`[100,200]`
+> ```jsx
+> 如果注释掉`<span style={{color: "red"}}>1111</span>`
+> ，则children输出为`[100,200]`
+> ```
 
 #### 具名插槽
 
@@ -4345,7 +4358,7 @@ ref的使用方法:
 
 * `this.box=React.createRef()`创建一个ref对象
 
-  ==<h2 ref={this.box}>==
+  `<h2 ref={this.box}></h2>`
   this.box.current获取DOM元素
 
 #### Hooks函数组件

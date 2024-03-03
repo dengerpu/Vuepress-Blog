@@ -64,7 +64,7 @@ jobs:
       - name: Upload COS
         uses: zkqiang/tencent-cos-action@v0.1.0
         with:
-          args: delete -r -f / && upload -r ./dist/ /
+          args: delete -r -f / && upload -r ./docs/.vuepress/dist/ /
           secret_id: ${{ secrets.TX_OSS_SECRET_ID }}
           secret_key: ${{ secrets.TX_OSS_SECRET_KEY }}
           bucket: ${{ secrets.TX_OSS_BUCKET }}

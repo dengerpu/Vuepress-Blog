@@ -1,13 +1,14 @@
----
 title: React全家桶
 index_img: /img/article/empty.png
 categories:
+
   - 分类
 tags:
   - 标签1
   - 标签2
 date: 2023-11-19 16:25:55
----
+
+[React官网](https://zh-hans.react.dev/learn)
 
 ## 初始化构建项目
 
@@ -602,8 +603,6 @@ root.render(
       首页
     </h2>
 ```
-
-
 
 ![image-20231120170631173](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202311201706271.png)
 
@@ -1879,7 +1878,8 @@ export default ClassComponent
     + 父组件第一次渲染
       父 `willMount` -> 父 `render`「子 `willMount` -> 子 `render` -> 子`didMount`」 -> 父`didMount` 
    + 父组件更新：
-  父 `shouldUpdate` -> 父`willUpdate` -> 父 `render` 「子`willReceiveProps` -> 子 `shouldUpdate` -> 子`willUpdate` -> 子 `render` -> 子 `didUpdate`」-> 父 `didUpdate`
+
+    父 `shouldUpdate` -> 父`willUpdate` -> 父 `render` 「子`willReceiveProps` -> 子 `shouldUpdate` -> 子`willUpdate` -> 子 `render` -> 子 `didUpdate`」-> 父 `didUpdate`
 
 * 父组件销毁：
   父 `willUnmount` -> 处理中「子`willUnmount` -> 子销毁」-> 父销毁
@@ -2118,3 +2118,3326 @@ export default Demo
 ```
 
 ![image-20240106222844163](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401062228354.png)
+
+#### setState的进阶研究
+
+React18中，对于setState的操作，采用了 `批处理`！
+
+- 构建了队列机制
+- 统一更新，提高视图更新的性能
+- 处理流程更加稳健
+
+在React 18之前，我们只在 `React合成事件/周期函数`期间批量更新；默认情况下，React中不会对 promise、setTimeout、原生事件处理（native event handlers）或其它React默认不进行批处理的事件进行批处理操作！
+
+源码
+
+```javascript
+// state可以是函数（传递函数可以获取先前的值）也可以是集合， callback回调函数
+setState<K extends keyof S>(
+            state: ((prevState: Readonly<S>, props: Readonly<P>) => Pick<S, K> | S | null) | (Pick<S, K> | S | null),
+            callback?: () => void,
+        ): void;
+```
+
+> `this.setState([partialState],[callback])`
+>
+> * `partialState` 支持部分状态更改 
+>
+>   ```jsx
+>     this.setState({
+>               x:100 //不论总共有多少状态，我们只修改了x，其余的状态不动
+>           });
+>   ```
+>
+> * `callback` 在状态更改/视图更新完毕后触发执行「也可以说**只要执行了setState，callback一定会执行**」
+>
+>   * 发生在`componentDidUpdate`周期函数之**后**「DidUpdate会在任何状态更改后都触发执行；而回调函数方式，可以在指定状态更新后处理一些事情；」
+>   * 即便我们基于`shouldComponentUpdate`阻止了状态/视图的更新，DidUpdate周期函数肯定不会执行了，但是我们设置的这个callback回调函数依然会被触发执行！！
+>   * 类似于Vue框架中的`$nextTick`！
+
+代码演示
+
+```jsx
+import React from 'react'
+
+class Demo extends React.Component {
+  state = {
+      x: 10,
+      y: 5,
+      z: 0
+  };
+  handle = () => {
+      let { x, y, z } = this.state;
+      this.setState({ x: x + 1 }, () => {
+          // 3
+        console.log("setState回调函数：当前部分状态更新完毕后执行")
+      });
+  };
+  shouldComponentUpdate() {
+      // 1
+    return true;
+  }
+  componentDidUpdate() {
+      // 2
+    console.log("componentDidUpdate,更新完毕后执行，在setState回调函数之前")
+  }
+  render() {
+      console.log('视图渲染:RENDER');
+      let { x, y, z } = this.state;
+      return <div>
+          x:{x} - y:{y} - z:{z}
+          <br />
+          <button onClick={this.handle}>按钮</button>
+      </div>;
+  }
+}
+export default Demo;
+```
+
+事件更新机制
+
+```javascript
+      // 同时修改三个状态值，只会出发一次视图更新
+      this.setState({ 
+        x: x + 1,
+        y: y + 1,
+        z: z + 1
+      });
+```
+
+> 在React18中，`setState`操作都是**异步**的「不论是在哪执行，例如：合成事件、周期函数、定时器...」
+>
+> 目的：实现状态的批处理「统一处理」
+>
+> * 有效减少更新次数，降低性能消耗
+> * 有效管理代码执行的逻辑顺序
+>
+>
+> 原理：利用了更新队列「updater」机制来处理的
+>    + 在当前相同的时间段内「浏览器此时可以处理的事情中」，遇到setState会立即放入到更新队列中！
+>          此时状态/视图还未更新
+>    + 当所有的代码操作结束，会“刷新队列”「通知更新队列中的任务执行」：把所有放入的setState合并在一起执行，只触发一次视图更新「批处理操作」
+
+![image-20240107203514983](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401072035292.png)
+
+![image-20240107204249513](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401072042679.png)
+
+>在React18 和 React16中，关于setState是同步还是异步，是有一些区别的！
+>
+>* React18中：不论在什么地方执行setState，它**都是异步**的「都是基于updater更新队列机制，实现的批处理」
+>* React16中：如果在**合成事件**「jsx元素中基于onXxx绑定的事件」、**周期函数**中，setState的操作是**异步**的！！但是如果setState出现在**其他异步操作中**「例如：定时器、手动获取DOM元素做的事件绑定等」，它将变为**同步**的操作「立即更新状态和让视图渲染」！！
+
+##### `flushSync`
+
+> flushSync:可以刷新“updater更新队列”，也就是让修改状态的任务立即批处理一次！！
+
+```jsx
+import React from 'react'
+import { flushSync } from 'react-dom'
+// flushSync:可以刷新“updater更新队列”，也就是让修改状态的任务立即批处理一次！！
+class Demo extends React.Component {
+  state = {
+      x: 10,
+      y: 5,
+      z: 0
+  };
+
+  handle = () => {
+      let { x, y, z } = this.state;
+      this.setState({ x: x + 1 })
+      console.log(this.state); //10/5/0
+      flushSync(() => {
+        this.setState({ z: z + 1 });
+        console.log(this.state); //10/5/0
+      }) 
+      console.log(this.state) //11/6/0
+      // flushSync();可以这样直接调用
+      
+      // 在修改z之前，要保证x/y都已经更改和让视图更新了
+      this.setState({ z: this.state.x + this.state.y });
+  };
+  shouldComponentUpdate() {
+    return true;
+  }
+  componentDidUpdate() {
+    console.log("componentDidUpdate,更新完毕后执行，在setState回调函数之前")
+  }
+	.....
+}
+
+export default Demo;
+```
+
+![image-20240107204513938](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401072045124.png)
+
+##### setState传递函数
+
+```jsx
+import React from "react";
+class Demo extends React.Component {
+    state = {
+        x: 0
+    };
+
+    handle = () => {
+        for (let i = 0; i < 20; i++) {
+             this.setState({
+                x: this.state.x + 1
+            }); 
+        }
+        console.log(this.state) // 这个时候打印this.state.x 还是为0
+        // 这样最后循环20次，只会触发一次render渲染,并且x渲染在页面上的值为1，因为循环20次都没改
+    };
+	......
+}
+
+export default Demo;
+```
+
+> 
+> setState接收的参数还可以是一个函数，在这个函数中可以拿先前的状态，并通过这个函数的返回值得到下一个状态
+> ```jsx
+>  this.setState((prevState)=>{
+>     // prevState:存储之前的状态值
+>     // return的对象，就是我们想要修改的新状态值「支持修改部分状态」
+>     return {
+>         xxx:xxx
+>     };
+>  })
+> ```
+
+想让最后变为20
+
+```jsx
+import React from "react";
+import { flushSync } from 'react-dom';
+
+/* 
+ this.setState((prevState)=>{
+    // prevState:存储之前的状态值
+    // return的对象，就是我们想要修改的新状态值「支持修改部分状态」
+    return {
+        xxx:xxx
+    };
+ })
+ */
+class Demo extends React.Component {
+    state = {
+        x: 0
+    };
+    handle = () => {
+        for (let i = 0; i < 20; i++) {
+          this.setState((prevState) => {
+            return {
+              x: prevState.x + 1
+            }
+          })
+        }
+      };
+	.....
+}
+
+export default Demo;
+```
+
+更新流程：![image-20240107205931538](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401072059740.png)
+
+## 合成事件
+
+> `Synthetic`
+> 合成事件是围绕浏览器原生事件，充当跨浏览器包装器的对象；它们将不同浏览器的行为合并为一个 API，这样做是为了确保事件在不同浏览器中显示一致的属性！
+
+### 合成事件的基本操作
+
+在JSX元素上，直接基于 `onXxx={函数}` 进行事件绑定！
+浏览器标准事件，在React中大部分都支持
+[https://developer.mozilla.org/zh-CN/docs/Web/Events#%E6%A0%87%E5%87%86%E4%BA%8B%E4%BB%B6](https://developer.mozilla.org/zh-CN/docs/Web/Events#标准事件)
+
+```jsx
+import React, { Component } from "react";
+export default class App extends Component {
+    state = {
+        num: 0
+    };
+    render() {
+        let { num } = this.state;
+        return <div>
+            {num}
+            <br />
+            <button onClick={(ev) => {
+                // 合成事件对象 ：SyntheticBaseEvent
+                console.log(ev); 
+            }}>处理</button>
+        </div>;
+    }
+};
+```
+
+#### 合成事件中的this和传参处理
+
+在类组件中，我们要时刻保证，合成事件绑定的函数中，里面的this是当前类的实例！
+
+```jsx
+import React from "react";
+
+class Demo extends React.Component {
+    
+    handle1() { //Demo.prototype => Demo.prototype.handle=function handle(){}
+        console.log(this); //undefined
+    }
+    handle2(x, y, ev) {
+        // 只要方法经过bind处理了，那么最后一个实参，就是传递的合成事件对象！！
+        console.log(this, x, y, ev); //实例 10 20 合成事件对象
+    }
+    handle3 = (ev) => {  //实例.handle3=()=>{....}
+        console.log(this); //实例
+        console.log(ev); //SyntheticBaseEvent 合成事件对象「React内部经过特殊处理，把各个浏览器的事件对象统一化后，构建的一个事件对象」
+    };
+    handle4 = (x, ev) => {
+        console.log(x, ev); //10 合成事件对象
+    };
+
+    render() {
+        return <div>
+            <button onClick={this.handle1}>按钮1</button>
+            <button onClick={this.handle2.bind(this, 10, 20)}>按钮2</button>
+            <button onClick={this.handle3}>按钮3</button>
+            <button onClick={this.handle4.bind(null, 10)}>按钮4</button>
+        </div>;
+    }
+}
+
+export default Demo;
+```
+
+> 基于React内部的处理，如果我们给**合成事件绑定一个“普通函数”**，当事件行为触发，绑定的函数执行；方法中的**this会是undefined**「不好」！！ 解决方案：this->实例:
+>
+> * 我们可以基于JS中的**bind**方法：预先处理函数中的this和实参的。（**apply和call会执行**）
+> * 推荐：当然也可以把绑定的函数设置为“**箭头函数**”，让其使用上下文中的this
+>
+> bind在React事件绑定的中运用
+>
+> * 绑定的方法是一个普通函数，需要改变函数中的this是实例，此时需要用到bind「一般都是绑定箭头函数」
+> * 想给函数传递指定的实参，可以基于bind预先处理「bind会把事件对象以最后一个实参传递给函数」 
+
+#### 合成事件对象
+
+合成事件对象`SyntheticBaseEvent`：我们在React合成事件触发的时候，也可以获取到事件对象，只不过此对象是合成事件对象「React内部经过特殊处理，把各个浏览器的事件对象统一化后，构建的一个事件对象」
+
+ 合成事件对象中，也包含了浏览器内置事件对象中的一些属性和方法「常用的基本都有」
+
+   + clientX/clientY
+   + pageX/pageY
+   + target
+   + type
+   + preventDefault
+   + stopPropagation
+   + `nativeEvent`：基于这个属性，可以获取浏览器内置『原生』的事件对象
+
+![image-20240108202146579](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401082021723.png)
+
+### 事件委托
+
+事件和事件绑定
+
+- 事件是浏览器内置行为
+- 事件绑定是给事件行为绑定方法
+  - 元素.onxxx=function…
+  - 元素.addEventListener(‘xxx’,function(){},true/false)
+
+事件的传播机制
+
+- 捕获 CAPTURING_PHASE
+- 目标 AT_TARGET
+- 冒泡 BUBBLING_PHASE
+
+阻止冒泡传播
+
+- ev.cancelBubble=true 「<=IE8」
+- ev.stopPropagation()
+- ev.stopImmediatePropagation() 阻止监听同一事件的其他事件监听器被调用
+
+> `el.addEventListener(type, listener, [useCapture])`
+>
+> * `type`：事件类型，click、mouseenter 等
+>
+> * `listener`：事件处理函数，事件发⽣时，就会触发该函数运⾏。
+>
+> * `useCapture`：布尔值，规定**是否是捕获型**，默认为 false（冒泡）。因为是可选的，往往也会省略它。
+
+```html
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>事件委托</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body {
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        #root {
+            width: 300px;
+            height: 300px;
+            background: lightblue;
+        }
+
+        #outer {
+            width: 200px;
+            height: 200px;
+            background: lightgreen;
+        }
+
+        #inner {
+            width: 100px;
+            height: 100px;
+            background: lightcoral;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="root" class="center">
+        <div id="outer" class="center">
+            <div id="inner" class="center"></div>
+        </div>
+    </div>
+
+    <!-- IMPORT JS -->
+    <script>
+        // 层级结构 window -> document -> html -> body -> root -> outer -> inner
+        // ev.stopPropagation：阻止事件的传播「包含捕获和冒泡」
+        // ev.stopImmediatePropagation：也是阻止事件传播，只不过它可以把当前元素绑定的其他方法「同级的」，如果还未执行，也不会让其再执行了！！
+        const html = document.documentElement,
+            body = document.body,
+            root = document.querySelector('#root'),
+            outer = document.querySelector('#outer'),
+            inner = document.querySelector('#inner');
+
+        root.addEventListener('click', function (ev) {
+            console.log('root 捕获');
+        }, true);
+        root.addEventListener('click', function () {
+            console.log('root 冒泡');
+        }, false);
+
+        outer.addEventListener('click', function () {
+            console.log('outer 捕获');
+        }, true);
+        outer.addEventListener('click', function () {
+            console.log('outer 冒泡');
+        }, false);
+
+        inner.addEventListener('click', function () {
+            console.log('inner 捕获');
+        }, true);
+        inner.addEventListener('click', function (ev) {
+            ev.stopImmediatePropagation(); // 给这个元素绑定的同样事件不会再执行了
+            // ev.stopPropagation();
+            console.log('inner 冒泡1');
+        }, false);  
+        inner.addEventListener('click', function (ev) {
+            console.log('inner 冒泡2');
+        }, false);
+    </script>
+</body>
+
+</html>
+```
+
+![image-20240107214527923](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401072145088.png)
+
+事件委托
+
+```javascript
+  <script>
+        /* 
+        事件委托：利用事件的传播机制，实现的一套事件绑定处理方案 
+          例如：一个容器中，有很多元素都要在点击的时候做一些事情
+            传统方案：首先获取需要操作的元素，然后逐一做事件绑定
+            事件委托：只需要给容器做一个事件绑定「点击内部的任何元素，根据事件的冒泡传播机制，都会让容器的点击事件也触发；我们在这里，根据事件源，做不同的事情就可以了；」
+          优势：
+            + 提高JS代码运行的性能，并且把处理的逻辑都集中在一起！！
+            + 某些需求必须基于事件委托处理，例如：除了点击xxx外，点击其余的任何东西，都咋咋咋...
+            + 给动态绑定的元素做事件绑定
+            + ...
+          限制：
+            + 当前操作的事件必须支持冒泡传播机制才可以
+              例如：mouseenter/mouseleave等事件是没有冒泡传播机制的
+            + 如果单独做的事件绑定中，做了事件传播机制的阻止，那么事件委托中的操作也不会生效！！
+        */
+        const body = document.body;
+        body.addEventListener('click', function (ev) {
+            // ev.target:事件源「点击的是谁，谁就是事件源」
+            let target = ev.target,
+                id = target.id;
+            if (id === "root") {
+                console.log('root');
+                return;
+            }
+            if (id === "inner") {
+                console.log('inner');
+                return;
+            }
+            if (id === "AAA") {
+                console.log('AAA');
+                return;
+            }
+            // 如果以上都不是，我们处理啥....
+        });
+        const outer = document.querySelector('#outer');
+        outer.addEventListener('click', function (ev) {
+            console.log('outer');
+            ev.stopPropagation();
+        });
+
+        /* const body = document.body,
+            root = document.querySelector('#root'),
+            outer = document.querySelector('#outer'),
+            inner = document.querySelector('#inner');
+        root.addEventListener('click', function () {
+            console.log('root');
+        });
+        outer.addEventListener('click', function () {
+            console.log('outer');
+        });
+        inner.addEventListener('click', function () {
+            console.log('inner');
+        }); */
+    </script>
+```
+
+> **`事件委托(代理)，就是利用事件的“冒泡传播机制”实现的`**
+>
+> 例如：给父容器做统一的事件绑定（点击事件），这样点击容器中的任意元素，都会传播到父容器上，触发绑定的方法！在方法中，基于不同的事件源做不同的事情！
+>
+> - 性能得到很好的提高「减少内存消耗」
+> - 可以给动态增加的元素做事件绑定
+> - 某些需求必须基于其完成
+
+### 合成事件的底层机制
+
+> 总原则：基于事件委托实现
+>
+>  React中合成事件的处理原理
+>
+>  “绝对不是”给当前元素基于addEventListener单独做的事件绑定，React中的合成事件，都是**基于“事件委托”**处理的！
+>
+> * 在React17及以后版本，都是**委托给#root**这个容器「**捕获和冒泡都做了委托**」；
+> * 在17版本以前，都是为委托给**document容器**的「而且只做了**冒泡阶段的委托**」；
+> * 对于没有实现事件传播机制的事件，才是单独做的事件绑定「例如：onMouseEnter/onMouseLeave...」
+>
+> 在组件渲染的时候，如果发现JSX元素属性中有 onXxx/onXxxCapture 这样的属性，**不会给当前元素直接做事件绑定**，只是把**绑定的方法赋值给元素的相关属性**！！例如：
+>      outer.onClick=() => {console.log('outer 冒泡「合成」');}  //这不是DOM0级事件绑定「这样才是outer.onclick」
+>      outer.onClickCapture=() => {console.log('outer 捕获「合成」');}
+>      inner.onClick=() => {console.log('inner 冒泡「合成」');}
+>      inner.onClickCapture=() => {console.log('inner 捕获「合成」');}
+>
+> 然后对#root这个容器做了事件绑定「捕获和冒泡都做了」
+>
+> ​     原因：因为组件中所渲染的内容，最后都会插入到#root容器中，这样点击页面中任何一个元素，最后都会把#root的点击行为触发！！
+> ​     而在给#root绑定的方法中，把之前给元素设置的onXxx/onXxxCapture属性，在相应的阶段执行!!
+
+#### React18合成事件原理 
+
+```jsx
+const outer = document.querySelector('.outer'),
+    inner = document.querySelector('.inner');
+/* 原理 */
+const dispatchEvent = function dispatchEvent(ev) {
+    let path = ev.path,
+        target = ev.target;
+    [...path].reverse().forEach(elem => {
+        let handler = elem.onClickCapture;
+        if (typeof handler === "function") handler(ev);
+    });
+    path.forEach(elem => {
+        let handler = elem.onClick;
+        if (typeof handler === "function") handler(ev);
+    });
+};
+document.addEventListener('click', function (ev) {
+    dispatchEvent(ev);
+}, false);
+```
+
+![image-20240110161412324](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401101614148.png)
+
+![image-20240110161551610](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401101615962.png)
+
+#### React16合成事件原理
+
+React17以前，是**委托给document元素**，并且**没有实现捕获阶段**的派发
+
+```jsx
+const outer = document.querySelector('.outer'),
+    inner = document.querySelector('.inner');
+/* 原理 */
+const dispatchEvent = function dispatchEvent(ev) {
+    let path = ev.path,
+        target = ev.target;
+    [...path].reverse().forEach(elem => {
+        let handler = elem.onClickCapture;
+        if (typeof handler === "function") handler(ev);
+    });
+    path.forEach(elem => {
+        let handler = elem.onClick;
+        if (typeof handler === "function") handler(ev);
+    });
+};
+document.addEventListener('click', function (ev) {
+    dispatchEvent(ev);
+}, false);
+
+......
+```
+
+![合成事件处理原理](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401101642865.png)
+
+![合成事件处理原理2](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401101643017.jpg)
+
+#### 事件对象池
+
+16版本中，存在事件对象池
+
+- 缓存和共享：对于那些被频繁使用的对象，在使用完后，不立即将它们释放，而是将它们缓存起来，以供后续的应用程序重复使用，从而减少创建对象和释放对象的次数，进而改善应用程序的性能！
+- 使用完成之后，释放对象「每一项内容都清空」，缓存进去！
+- 调用 event.persist() 可以保留住这些值！
+
+17版本及以后，移除了事件对象池！
+
+```javascript
+syntheticInnerBubble = (syntheticEvent) => {
+    // syntheticEvent.persist();    
+    setTimeout(() => {
+        console.log(syntheticEvent); //每一项都置为空
+    }, 1000);
+};
+```
+
+![image-20240108163252218](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401081632324.png)
+
+### click延迟和Vue中的事件处理机制
+
+click事件在移动端存在`300ms`延迟
+
+- pc端的click是点击事件
+- 移动端的click是单击事件
+
+> 连着点击两下:
+>
+> * PC端会触发︰两次click、一次dblclick
+>
+> * 移动端:不会触发click，只会触发dblclick
+>
+> 单击事件:第一次点击后，监测300ms，看是否有第二次点击操作，如果没有就是单击，如果有就是双击
+
+#### 解决移动端300ms延迟
+
+```jsx
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+
+// 解决移动端300ms延迟
+import fastclick from 'fastclick';
+fastclick.attach(document.body);
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(
+  <App />
+);
+```
+
+也可以自己基于touch事件模型去实现
+
+```jsx
+const box = document.querySelector('.box');
+box.ontouchstart = function (ev) {
+    let point = ev.changedTouches[0];
+    this.startX = point.pageX;
+    this.startY = point.pageY;
+    this.isMove = false;
+};
+box.ontouchmove = function (ev) {
+    let point = ev.changedTouches[0];
+    let changeX = point.pageX - this.startX;
+    let changeY = point.pageY - this.startY;
+    if (Math.abs(changeX) > 10 || Math.abs(changeY) > 10) {
+        this.isMove = true;
+    }
+};
+box.ontouchend = function (ev) {
+    if (!this.isMove) {
+        console.log('点击触发');
+    }
+};
+```
+
+### 循环给元素绑定事件
+
+```jsx
+import React from 'react'
+class Demo extends React.Component {
+  state = {
+    arr: [{
+        id: 1,
+        title: '新闻'
+    }, {
+        id: 2,
+        title: '体育'
+    }, {
+        id: 3,
+        title: '电影'
+    }]
+  };
+
+  handle = (item) => {
+    // item:点击这一项的数据
+    console.log('我点击的是：' + item.title);
+  }
+
+  render() {
+    let { arr } = this.state
+    return <>
+      {arr.map(item => {
+        let {id, title} = item;
+        return <span key={id}style={{
+            padding: '5px 15px',
+            marginRight: 10,
+            border: '1px solid #DDD',
+            cursor: 'pointer'
+        }} onClick={this.handle.bind(this, item)}>
+          {title}  
+        </span>
+      })}
+    </>
+  }
+}
+
+export default Demo;
+```
+
+> 按照常理来讲,此类需求用事件委托处理是组好的!!!
+>
+> 但是在React中，我们循环给元素绑定的合成事件，本身就是**基于事件委托处理**的!!所以无需我们自己再单独的设置事件委托的处理机制!!!
+
+#### Vue中的事件处理机制
+
+> 核心：给创建的DOM元素，单独基于`addEventListener`实现事件绑定
+> Vue事件优化技巧：手动基于事件委托处理
+
+```vue
+<template>
+  <div id="app">
+    <ul class="box" @click="handler">
+      <li
+        class="item"
+        v-for="(item, index) in arr"
+        :data-item="item"
+        :key="index"
+      >
+        {{ item }}
+      </li>
+    </ul>
+  </div>
+</template>
+
+<script>
+export default {
+  name: "App",
+  data() {
+    return {
+      arr: [10, 20, 30],
+    };
+  },
+  methods: {
+    handler(ev) {
+      let target = ev.target;
+      if (target.tagName === "LI") {
+        console.log(target.getAttribute("data-item"));
+      }
+    },
+  },
+};
+</script>
+```
+
+## TASK-TODO项目
+
+### 初始化项目
+
+```shell
+create-react-app task-todo
+```
+
+#### 暴露配置项
+
+```shell
+npm run eject
+```
+
+> 该操作是不可逆的，一旦执行了就不能再恢复了
+>
+> 已修改的文件要先提交git到本地，否则会报错
+
+#### 配置跨域
+
+* 安装
+
+  ```shell
+  npm install http-proxy-middleware
+  ```
+
+* 在src目录中，新建setupProxy.js
+
+  ```js
+  const { createProxyMiddleware } = require("http-proxy-middleware");
+  
+  module.exports = function (app) {
+    app.use(
+        createProxyMiddleware("/api", {
+            target: "http://127.0.0.1:9000",
+            changeOrigin: true,
+            ws: true,
+            pathRewrite: { "^/api": "" }
+        })
+    );
+  };
+  ```
+
+  > 直接在src编写setupProxy.js，其他配置React已经写好了
+  >
+  > ![image-20240111202854046](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401112028218.png)
+
+#### Ant Design配置
+
+* 安装
+
+  ```shell
+  npm install antd --save
+  # 使用icons图标要安装下面的
+  npm install @ant-design/icons --save
+  ```
+
+* 配置国际化
+
+  index.jsx
+
+  ```jsx
+  import React from 'react';
+  import ReactDOM from 'react-dom/client';
+  import zhCN from 'antd/locale/zh_CN'
+  import { ConfigProvider } from 'antd';
+  import Task from './views/Task';
+  
+  
+  const root = ReactDOM.createRoot(document.getElementById('root'));
+  root.render(
+    <ConfigProvider locale={zhCN}>
+      <Task></Task>
+    </ConfigProvider>
+  );
+  ```
+
+#### 清除默认样式
+
+src/assets/css/reset.min.css
+
+```css
+body,h1,h2,h3,h4,h5,h6,hr,p,blockquote,dl,dt,dd,ul,ol,li,button,input,textarea,th,td{margin:0;padding:0}body{font-size:12px;font-style:normal;font-family:"\5FAE\8F6F\96C5\9ED1",Helvetica,sans-serif}small{font-size:12px}h1{font-size:18px}h2{font-size:16px}h3{font-size:14px}h4,h5,h6{font-size:100%}ul,ol{list-style:none}a{text-decoration:none;background-color:transparent}a:hover,a:active{outline-width:0;text-decoration:none}table{border-collapse:collapse;border-spacing:0}hr{border:0;height:1px}img{border-style:none}img:not([src]){display:none}svg:not(:root){overflow:hidden}html{-webkit-touch-callout:none;-webkit-text-size-adjust:100%}input,textarea,button,a{-webkit-tap-highlight-color:rgba(0,0,0,0)}article,aside,details,figcaption,figure,footer,header,main,menu,nav,section,summary{display:block}audio,canvas,progress,video{display:inline-block}audio:not([controls]),video:not([controls]){display:none;height:0}progress{vertical-align:baseline}mark{background-color:#ff0;color:#000}sub,sup{position:relative;font-size:75%;line-height:0;vertical-align:baseline}sub{bottom:-0.25em}sup{top:-0.5em}button,input,select,textarea{font-size:100%;outline:0}button,input{overflow:visible}button,select{text-transform:none}textarea{overflow:auto}button,html [type="button"],[type="reset"],[type="submit"]{-webkit-appearance:button}button::-moz-focus-inner,[type="button"]::-moz-focus-inner,[type="reset"]::-moz-focus-inner,[type="submit"]::-moz-focus-inner{border-style:none;padding:0}button:-moz-focusring,[type="button"]:-moz-focusring,[type="reset"]:-moz-focusring,[type="submit"]:-moz-focusring{outline:1px dotted ButtonText}[type="checkbox"],[type="radio"]{box-sizing:border-box;padding:0}[type="number"]::-webkit-inner-spin-button,[type="number"]::-webkit-outer-spin-button{height:auto}[type="search"]{-webkit-appearance:textfield;outline-offset:-2px}[type="search"]::-webkit-search-cancel-button,[type="search"]::-webkit-search-decoration{-webkit-appearance:none}::-webkit-input-placeholder{color:inherit;opacity:.54}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}.clearfix:after{display:block;height:0;content:"";clear:both}
+```
+
+src/index.css
+
+```css
+@import './assets/css/reset.min.css';
+```
+
+src/index.js
+
+```js
+import './index.css'
+```
+
+#### 封装请求
+
+src/api/http.js
+
+```js
+import axios from 'axios';
+import qs from 'qs';
+import { message } from 'antd';
+import _ from '../assets/utils/util';
+
+
+const http = axios.create({
+  baseURL: '/api',
+  timeout: 5000
+})
+
+http.defaults.transformRequest = data => {
+  // 转为urlencoded格式字符串
+  if(_.isPlainObject(data)) data = qs.stringify(data);
+  return data;
+}
+
+http.interceptors.response.use(response => {
+  return response.data
+}, err => {
+  // 请求失败
+  message.error(err.message);
+  return Promise.reject(err)
+})
+
+export default http
+```
+
+> 基于post请求向服务器发送请求，需要基于请求主体把信息传递给服务器
+>
+> * 普通对象→变为"[object Object]”字符串传递给服务器「不对的J
+> * Axios库对其做了处理，我们写的是普通对象，Axios内部会默认把其变为JSON字符串，传递给服务器!!
+>
+> 格式要求:
+>
+> * 字符串
+>
+>   * json字符串 **application/json** `{"x":10,"name":"张三"}`
+>   * urlencoded格式字符串**application/x-www-urlencoded** `"x=10&name=张三"`
+>   * 普通字符串text/plain
+>
+> * FormData对象「用于文件上传」**multipart/form-data**
+>
+>   * ```js
+>     let fm=new FormData();
+>     fm.append('file',file);
+>     ```
+>
+>   * buffer或者进制格式
+
+### 编写代码
+
+接口
+
+src/api/index.js
+
+```js
+import htpp from './http'
+
+// 获取指定状态的任务信息
+export const getTaskList = (state = 0, current = 1, pageSize = 2) => {
+  return htpp.get('/getTaskList', {
+    params: {
+      state,
+      page: current,
+      limit: pageSize
+    }
+  })
+}
+
+// 新增任务
+export const addTask = (task, time) => {
+  return htpp.post('/addTask', {
+    task,
+    time
+  })
+}
+
+// 删除任务
+export const removeTask = (id) => {
+  return htpp.get('/removeTask', {
+    params: {
+      id
+    }
+  })
+}
+
+// 完成任务
+export const completeTask = (id) => {
+  return htpp.get('/completeTask', {
+    params: {
+      id
+    }
+  })
+}
+
+```
+
+页面代码：
+
+src/views/Task.jsx
+
+```jsx
+import React from 'react'
+import { flushSync } from 'react-dom'
+import { Button, Tag, Table, Popconfirm, Modal, Form, Input, DatePicker, message } from 'antd';
+import '../assets/css/task.scss'
+import { getTaskList, addTask, removeTask, completeTask } from '../api';
+
+
+const zero = function zero(text) {
+  text = String(text);
+  return text.length < 2 ? '0' + text : text;
+}
+const formatTime = function formatTime(time) {
+  let arr = time.match(/\d+/g);
+  let [, month, day = '00', hours, minutes = '00'] = arr;
+  return `${zero(month)}-${zero(day)} ${zero(hours)}:${zero(minutes)}`;
+}
+
+class Task extends React.Component {
+  /* 表格列的数据 */
+  columns = [
+    {
+      title: '编号',
+      dataIndex: 'id',
+      align: 'center',
+      width: '8%'
+    },
+    {
+      title: '任务描述',
+      dataIndex: 'task',
+      ellipsis: true,
+      width: '50%'
+    },
+    {
+      title: '状态',
+      dataIndex: 'state',
+      align: 'center',
+      width: '10%',
+      render: text => +text === 1 ? <span style={{color: 'red'}}>未完成</span> : <span style={{color: 'green'}}>已完成</span>
+    },
+    {
+      title: '完成时间',
+      dataIndex: 'time',
+      align: 'center',
+      width: '15%',
+      render: (_, record) => {
+        let { state, time, complete } = record;
+        if (+state === 2) time = complete;
+        return formatTime(time)
+      }
+    }, 
+    {
+      title: '操作',
+      render: (_, record) => {
+        let { id, state } = record;
+        return <>
+          <Popconfirm
+            title="您确定要删除此任务吗"
+            onConfirm={this.removeTask.bind(this, id)}
+          >
+            <Button type="link">删除</Button>
+          </Popconfirm>
+          
+          {
+            +state !== 2 ? <Popconfirm title="您确定要完成此任务吗" onConfirm={this.updateTaskState.bind(null, id)}>
+              <Button type="link">完成</Button>
+            </Popconfirm> : null
+          }
+        </>
+      }
+    }
+  ]
+  state = {
+    tableData: [], // 表格数据
+    modalVisible: false,  // 弹窗是否显示
+    saveTaskconfirmLoading: false, // 提交任务loading
+    tableLoading: false, // 表格loading
+    selectIndex: 0,
+    pageInfo: {
+      current: 1, // 当前页数
+      pageSize: 2, // 每页条数
+      showSizeChanger: true, // 显示分页切换器
+      showQuickJumper: true, // 显示快速跳转至某页
+      pageSizeOptions: [1,2,5,10],
+      total: 0,
+      showTotal: (total, range) => `${range[0]}-${range[1]} 共 ${total} 条`,
+      onChange: (page, pageSize) => this.pageChange(page, pageSize)
+    }
+  }
+
+  // 页码切换事件
+  pageChange = (page, pageSize) => {
+    console.log('页码发生变化')
+    flushSync(() => {
+      this.setState({ pageInfo: { ...this.state.pageInfo, current: page, pageSize } });
+    })
+    // console.log('页码发生变化')
+    this.queryData()
+  }
+
+  // 完整状态切换
+  changeIndex = (index) => {
+    if(this.state.selectIndex === index) return
+    
+    // this.setState({selectIndex: index}) 
+    // 直接这样 this.state.selectIndex还是原来的值，并未及时改变
+    // 如果在这个时候发送请求，获取到的selectIndex还是上一次的值
+
+    // 解决方法1
+    // this.setState({selectIndex: index}, () => {
+    //   // 发送请求获取数据
+    //   console.log(this.state.selectIndex)
+    // })
+
+    // 解决方法2
+    flushSync(() => {
+      this.setState({selectIndex: index})
+    });
+    // 重置当前页的参数
+    flushSync(() => {
+      this.setState({ pageInfo: { ...this.state.pageInfo, current: 1 } });
+    })
+    this.queryData();
+  }
+
+  // 获取任务列表
+  queryData = async () => {
+    let {selectIndex} = this.state;
+    this.setState({tableLoading: true})
+    try {
+      let { code, list, page, total } = await getTaskList(selectIndex, this.state.pageInfo.current, this.state.pageInfo.pageSize);
+      if(+code !== 0) { // 0代表获取成功
+        list = []
+      }
+      console.log('请求获取到的数据', list)
+      this.setState({
+        tableData:list,
+        pageInfo: {
+          ...this.state.pageInfo,
+          current: +page,
+          total: +total
+        }
+      })
+    } catch (error) {
+      message.error('获取任务列表失败')
+    }
+    this.setState({tableLoading: false})
+  }
+
+  // 删除任务
+  removeTask = async (id) => {
+    let { code } = await removeTask(id);
+    if(+code !== 0) {
+      message.error('删除任务失败')
+      return
+    } else {
+      this.queryData()
+      message.success('删除任务成功')
+    } 
+  }
+
+  // 修改任务状态
+  updateTaskState = async (id) => {
+    let {code} = await completeTask(id);
+    if(+code !== 0) {
+      message.error('修改任务状态失败')
+      return
+    } else {
+      this.queryData()
+      message.success('修改任务状态成功')
+    } 
+  }
+
+  // 提交任务
+  saveTask = async () => {
+    try {
+      // 表单校验
+      await this.formRef.validateFields()
+      let {task , time} = this.formRef.getFieldsValue();
+      time = time.format('YYYY-MM-DD HH:mm:ss');
+      this.setState({saveTaskconfirmLoading: true})
+      // 向服务器端发送请求
+      let { code } = await addTask(task, time);
+      if(+code !== 0) {
+        message.error('添加任务失败');
+      } else {
+        // 关闭弹框
+        this.closeMode();
+        // 获取最新的数据
+        this.queryData();
+        message.success('添加任务成功');
+      }
+    }catch (_) {
+      message.error('请填写完整信息');
+    }
+    this.setState({saveTaskconfirmLoading: false})
+  }
+
+  // 关闭弹框事件
+  closeMode = () => {
+    this.setState({
+      modalVisible: false,
+      saveTaskconfirmLoading: false
+    })
+    this.formRef.resetFields();
+  }
+
+  componentDidMount() {
+    this.queryData();
+    console.log('获取到的表格数据', this.state.tableData)
+  }
+
+  render() {
+    console.log('视图更新')
+    let {tableData, modalVisible, saveTaskconfirmLoading, selectIndex, tableLoading, pageInfo} = this.state
+    console.log('分页器的配置', pageInfo)
+    return <div className='task_box'>
+      <div className="task_header">
+        <h1>TASK OA任务管理系统</h1>
+        <Button type="primary" onClick={() => {
+          this.setState({
+            modalVisible: true
+          })
+        }}>新增任务</Button>
+      </div>
+      <div className='task_content'>
+        <div className='task_content_header'>
+          {['全部', '未完成', '已完成'].map( (item, index) => {
+            return <Tag color={selectIndex === index ? '#1677ff' : ''} key={index} onClick={this.changeIndex.bind(null, index)}>{item}</Tag>
+          })}
+        </div>
+        <div className='task_content_table'>
+          <Table dataSource={tableData} loading={tableLoading} columns={this.columns}  rowKey="id" pagination={pageInfo}/>
+        </div>
+      </div>
+      {/* 新增任务弹出框 */}
+      <Modal title="新增任务窗口" open={modalVisible} maskClosable={false} okText="提交信息" onCancel={this.closeMode} onOk={this.saveTask} confirmLoading={saveTaskconfirmLoading}>
+        <Form ref={x => this.formRef = x} layout="vertical" initialValues={{ task: '', time: '' }} validateTrigger="onBlur">
+          <Form.Item label="任务描述" name="task" rules={[
+            { required: true, message: '任务描述是必填项' }, 
+            { min: 6, message: '输入的内容至少6位及以上' }
+          ]}>
+            <Input.TextArea rows={4} />
+          </Form.Item>
+          <Form.Item label="任务预期完成时间" name="time" rules={[
+            { required: true, message: '预期完成时间是必填项' }
+          ]}>
+            <DatePicker showTime />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </div>
+  }
+}
+
+export default Task;
+```
+
+![image-20240114151901040](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401141519242.png)
+
+最终实现效果：
+
+![image-20240113161938578](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401131619726.png)
+
+### 双向绑定
+
+vue中是实现了双向绑定，但是React中却不是，需要我们自己实现
+
+>  Vue是MVVM框架：数据驱动视图渲染、视图驱动数据更改「自动监测页面中表单元素的变化，从而修改对应的状态」 双向驱动
+>  React是MVC框架：数据驱动视图渲染  单向驱动
+>
+>  需要自己手动实现，视图变化，去修改相关的状态
+
+```jsx
+import React from 'react'
+
+class Demo extends React.Component {
+  state = {
+    email: ''
+  };
+
+  render() {
+      return <div>
+          <input type="text" value={this.state.email} onChange={(ev) => {
+            this.setState({
+              email: ev.target.value.trim()
+            })
+            console.log(this.state.email)
+          }}/>
+      </div>;
+  }
+}
+
+export default Demo
+```
+
+### 总结
+
+#### 细节注意
+
+再修改state对象里面的对象时，要**注意我们只是修改了部分值**，而不是全不值，所有我们还要把之前的赋值过来
+
+```jsx
+      this.setState({
+        tableData:list,
+        pageInfo: {
+          ...this.state.pageInfo,
+          current: +page,
+          total: +total
+        }
+      })
+```
+
+由于setState是异步操作，统一处理，所以视图会存在更新不及时的情况
+
+```jsx
+    // this.setState({selectIndex: index}) 
+    // 直接这样 this.state.selectIndex还是原来的值，并未及时改变
+    // 如果在这个时候发送请求，获取到的selectIndex还是上一次的值
+
+    // 解决方法1
+    // this.setState({selectIndex: index}, () => {
+    //   // 发送请求获取数据
+    //   console.log(this.state.selectIndex)
+    // })
+
+    // 解决方法2
+    flushSync(() => {
+      this.setState({selectIndex: index})
+    });
+```
+
+数据请求放`componentDidMount`周期函数中
+
+> 正常情况下，我们应该在第一次渲染之前componentWillMount开发发送异步的数据请求
+>
+> * 请求发送后，不需要等到
+> * 继续渲染
+> * 在第一次渲染结束后，可能数据已经回来了「即便没回来，也快了J
+> * 等到数据获取后，我们修改状态，让视图更新，呈现真实的数据即可
+>
+> 但是**componentWillMount是不安全的**
+
+#### pm2服务持久化管理
+
+安装
+
+```shell
+npm i pm2-g #mac加sudo
+```
+
+启动命令
+
+```shell
+pm2 start server.js --name TASK
+```
+
+重启命令
+
+```shell
+pm2 restart TASK
+```
+
+停止命令
+
+```shell
+pm2 stop TASK
+```
+
+删除命令
+
+```shell
+pm2 delete TASK
+```
+
+> 终端关掉，服务器也在，如果电脑重启，服务器会消失
+
+#### UI组件库
+
+* React的UI组件库
+  * PC端:	Anid、 AntdPro....
+  * 移动端:	AntdMobile...
+* Vue的UI组件库
+  * PC端:	element-ui、antd for vue、iview....
+  * 移动端:	vant、cube...
+
+> antd组件库自袱按需导入
+> 我们安装整个antd，后期在项目中用到哪些组件，最后打包的时候，只打包用的
+
+#### Antd中Form表单处理机制
+
+![image-20240111150138457](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401111501654.png)
+
+#### 时间处理插件
+
+时间日期处理插件:
+
+* `moment.js`    antd版本<=4
+* `dayjs`    antd版本>=5
+  * 体积小「2KB，moment貌似16kb」
+  * 用的API方法，和moment类似
+  * 更符合国际化日期处理规范
+  * .….
+
+### 利用Hooks组件改造
+
+![image-20240115215513652](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401152155955.png)
+
+触发Form表单校验的方式:
+
+1. 前提:提交按钮包裹在`<Form>`中，并且htmlType='submit'点击这个按钮,会自动触发Form的表单校验
+   表单校验通过，会执行`<Form onFinish={函数}>`事件
+
+   * 函数执行，形参获取的就是表单收集的信息
+
+2. 我们获取Form组建的实例[或者是子组件内部返回的方法]
+
+   基于这些方法，触发表单校验&获取表单手机的信息等
+
+   * `validateFields`
+   * `getFieldsValue`
+   * `resetFields`
+
+ant-designer提供的独有的获取表单ref方法 **只适用于函数式组件**
+
+```jsx
+<Form form={formRef}></Form>
+// 使用   
+let [formRef] = Form.useForm(); // 表单ref
+```
+
+![image-20240115221455188](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401152214457.png)
+
+> 函数组件中，遇到:修改某个状态后(视图更新后)，想去做一些事情(而这些事情中，**需要用到新修改的状态值**)
+> 此时:我们不能直接在代码的下面编写，或者把修改状态改为同步的，这些都不可以!因为只有在函数重新执行，产生的新的闭包中，才可以获取最新的状态值! !**原始闭包中用的还是之前的状态值**! !
+>
+> 解决方案：**基于useEffect设置状态的依赖**， 在依赖的状态发生改变后，去做要做的事情! !
+>
+> 修改某个状态后(视图更新后)，想去做一些事情，但是要处理的事情，和新的状态值没有关系，此时可以把修改状态的操作，基于`flushSync`变为同步处理即可! 
+
+完整代码：
+
+
+```jsx
+import React, { useEffect, useState, useRef } from 'react'
+import { Button, Tag, Table, Popconfirm, Modal, Form, Input, DatePicker, message } from 'antd';
+import '../assets/css/task.scss'
+import { getTaskList, addTask, removeTask, completeTask } from '../api';
+
+
+const zero = function zero(text) {
+  text = String(text);
+  return text.length < 2 ? '0' + text : text;
+}
+const formatTime = function formatTime(time) {
+  let arr = time.match(/\d+/g);
+  let [, month, day = '00', hours, minutes = '00'] = arr;
+  return `${zero(month)}-${zero(day)} ${zero(hours)}:${zero(minutes)}`;
+}
+
+const Task = function Task() {
+  /* 表格列的数据 */
+  const columns = [
+    {
+      title: '编号',
+      dataIndex: 'id',
+      align: 'center',
+      width: '8%'
+    },
+    {
+      title: '任务描述',
+      dataIndex: 'task',
+      ellipsis: true,
+      width: '50%'
+    },
+    {
+      title: '状态',
+      dataIndex: 'state',
+      align: 'center',
+      width: '10%',
+      render: text => +text === 1 ? <span style={{color: 'red'}}>未完成</span> : <span style={{color: 'green'}}>已完成</span>
+    },
+    {
+      title: '完成时间',
+      dataIndex: 'time',
+      align: 'center',
+      width: '15%',
+      render: (_, record) => {
+        let { state, time, complete } = record;
+        if (+state === 2) time = complete;
+        return formatTime(time)
+      }
+    }, 
+    {
+      title: '操作',
+      render: (_, record) => {
+        let { id, state } = record;
+        return <>
+          <Popconfirm
+            title="您确定要删除此任务吗"
+            onConfirm={deleteTask.bind(this, id)}
+          >
+            <Button type="link">删除</Button>
+          </Popconfirm>
+          
+          {
+            +state !== 2 ? <Popconfirm title="您确定要完成此任务吗" onConfirm={updateTaskState.bind(null, id)}>
+              <Button type="link">完成</Button>
+            </Popconfirm> : null
+          }
+        </>
+      }
+    }
+  ]
+
+   // 分页配置信息
+   const pageProps = {
+    current: 1, // 当前页数
+    pageSize: 2, // 每页条数
+    showSizeChanger: true, // 显示分页切换器
+    showQuickJumper: true, // 显示快速跳转至某页
+    pageSizeOptions: [1,2,5,10],
+    total: 0,
+    showTotal: (total, range) => `${range[0]}-${range[1]} 共 ${total} 条`,
+    onChange: (page, pageSize) => pageChange(page, pageSize)
+  }
+
+  let [tableData, setTableData] = useState([]); // 表格数据
+  let [pageInfo, setPageInfo] = useState(pageProps); // 分页信息
+  let [modalVisible, setModalVisible] = useState(false); // 弹窗是否显示
+  let [tableLoading, setTableLoading] = useState(false); // 表格loading
+  let [saveTaskconfirmLoading, setSaveTaskconfirmLoading] = useState(false); // 提交任务loading
+  let [selectIndex, setSelectIndex] = useState(0); // 选中项的索引
+
+
+  // let formRef = useRef(null); // 表单ref
+  // 这种方式ref = {formRef} 获取实例： formRef.current
+ 
+  // ant-design提供的
+   let [formRef] = Form.useForm(); // 表单ref
+
+
+  // 页码切换事件
+  const pageChange = (page, pageSize) => {
+    setPageInfo({
+      ...pageInfo,
+      current: page,
+      pageSize
+    })
+    // queryData()
+    // console.log('页码发生变化')
+  }
+
+  useEffect(() => {
+    queryData()
+    // console.log('分页信息发生改变')
+  }, [pageInfo.current, pageInfo.pageSize, selectIndex])
+
+
+  // 完整状态切换
+  const changeIndex = (index) => {
+    // 这个可以不要，因为useState存在性能优化，值相同视图不更新
+    // if(selectIndex === index) return
+    
+    // 这样写是错误的，因为闭包问题，queryData获取的上下文的setSelectIndex还是上次的
+    // flushSync(() => {
+    //   setSelectIndex(index)
+    // })
+    // queryData();
+    setSelectIndex(index);
+    setPageInfo((prev) => {
+      return {
+        ...prev,
+        current: 1
+      }
+    })
+  }
+
+  // 获取任务列表
+  const queryData = async () => {
+    setTableLoading(true)
+    try {
+      let { code, list, page, total } = await getTaskList(selectIndex, pageInfo.current, pageInfo.pageSize);
+      if(+code !== 0) { // 0代表获取成功
+        list = []
+      }
+      console.log('请求获取到的数据', list)
+      setTableData(list)
+      setPageInfo({
+        ...pageInfo,
+        total: +total
+      })
+    } catch (error) {
+      message.error('获取任务列表失败')
+    }
+    setTableLoading(false)
+  }
+
+  // 删除任务
+  const deleteTask = async (id) => {
+    let { code } = await removeTask(id);
+    if(+code !== 0) {
+      message.error('删除任务失败')
+      return
+    } else {
+      queryData()
+      message.success('删除任务成功')
+    } 
+  }
+
+  // 修改任务状态
+  const updateTaskState = async (id) => {
+    let {code} = await completeTask(id);
+    if(+code !== 0) {
+      message.error('修改任务状态失败')
+      return
+    } else {
+      queryData()
+      message.success('修改任务状态成功')
+    } 
+  }
+
+  // 提交任务
+  const saveTask = async () => {
+    try {
+      // 表单校验
+      await formRef.validateFields()
+      let {task , time} = formRef.getFieldsValue();
+      time = time.format('YYYY-MM-DD HH:mm:ss');
+      setSaveTaskconfirmLoading(true)
+      // 向服务器端发送请求
+      let { code } = await addTask(task, time);
+      if(+code !== 0) {
+        message.error('添加任务失败');
+      } else {
+        // 关闭弹框
+        closeMode();
+        // 获取最新的数据
+        queryData();
+        message.success('添加任务成功');
+      }
+    }catch (_) {
+      message.error('请填写完整信息');
+    }
+    setSaveTaskconfirmLoading(false)
+  }
+
+  // 关闭弹框事件
+  const closeMode = () => {
+    setModalVisible(false)
+    setSaveTaskconfirmLoading(false)
+    formRef.resetFields();
+  }
+
+  // 页面第一次加载，发送请求获取数据
+  useEffect(() => {
+    queryData();
+    console.log('获取到的表格数据', tableData)
+  }, [])
+
+
+
+  return <div className='task_box'>
+    <div className="task_header">
+      <h1>TASK OA任务管理系统</h1>
+      <Button type="primary" onClick={() => {
+        setModalVisible(true)
+      }}>新增任务</Button>
+      </div>
+      <div className='task_content'>
+        <div className='task_content_header'>
+          {['全部', '未完成', '已完成'].map( (item, index) => {
+            return <Tag color={selectIndex === index ? '#1677ff' : ''} key={index} onClick={changeIndex.bind(null, index)}>{item}</Tag>
+          })}
+        </div>
+        <div className='task_content_table'>
+          <Table dataSource={tableData} loading={tableLoading} columns={columns}  rowKey="id" pagination={pageInfo}/>
+        </div>
+      </div>
+      {/* 新增任务弹出框 */}
+      <Modal title="新增任务窗口" open={modalVisible} maskClosable={false} okText="提交信息" onCancel={closeMode} onOk={saveTask} confirmLoading={saveTaskconfirmLoading}>
+        <Form form={formRef} layout="vertical" initialValues={{ task: '', time: '' }} validateTrigger="onBlur">
+          <Form.Item label="任务描述" name="task" rules={[
+            { required: true, message: '任务描述是必填项' }, 
+            { min: 6, message: '输入的内容至少6位及以上' }
+          ]}>
+            <Input.TextArea rows={4} />
+          </Form.Item>
+          <Form.Item label="任务预期完成时间" name="time" rules={[
+            { required: true, message: '预期完成时间是必填项' }
+          ]}>
+            <DatePicker showTime />
+          </Form.Item>
+        </Form>
+      </Modal>
+  </div>
+}
+
+export default Task;
+```
+
+
+
+## Hooks 组件
+
+### React组件分类
+
+- 函数组件
+  - **不具备“状态、ref、周期函数”**等内容，第一次渲染完毕后，无法基于组件内部的操作来控制其更新，因此称之为静态组件！
+  - 但是具备属性及插槽，父组件可以控制其重新渲染！
+  - 渲染流程简单，渲染速度较快！
+  - 基于FP（函数式编程）思想设计，提供更细粒度的逻辑组织和复用！
+- 类组件
+  - **具备“状态、ref、周期函数、属性、插槽”**等内容，可以灵活的控制组件更新，基于钩子函数也可灵活掌控不同阶段处理不同的事情！
+  - 渲染流程繁琐，渲染速度相对较慢！
+  - 基于OOP（面向对象编程）思想设计，更方便实现继承等！
+
+React Hooks 组件，就是基于 React 中新提供的 Hook 函数，可以`让函数组件动态化`!
+
+### Hook函数概览
+
+官方文档：https://zh-hans.react.dev/learn#using-hooks
+
+- 基础 Hook
+  - `useState` 使用状态管理
+  - `useEffect` 使用周期函数
+  - `useContext` 使用上下文信息
+- 额外的 Hook
+  - `useReducer` useState的替代方案，借鉴redux处理思想，管理更复杂的状态和逻辑
+  - `useCallback` 构建缓存优化方案
+  - `useMemo` 构建缓存优化方案
+  - `useRef` 使用ref获取DOM
+  - `useImperativeHandle` 配合forwardRef（ref转发）一起使用
+  - `useLayoutEffect` 与useEffect相同，但会在所有的DOM变更之后同步调用effect
+  - …
+- 自定义Hook
+- ……
+
+### useState
+
+> 作用：在函数组件中使用状态，修改状态值可让函数组件更新，类似于类组件中的setState
+> 语法：
+> `const [state, setState] = useState(initialState);`
+> 返回一个 state，以及更新 state 的函数
+
+#### 基本使用
+
+> `useState`：React Hook函数之一，目的是在函数组件中使用状态，并且后期基于状态的修改，可以让组件更新
+> `let [num,setNum] = useState(initialValue);`
+>
+>    + 执行useState，传递的initialValue是初始的状态值
+>      +  执行这个方法，返回结果是一个数组：[状态值,修改状态的方法]
+>         
+>        *  num变量存储的是：获取的状态值
+>        
+>        + setNum变量存储的是：修改状态的方法
+> + 执行 setNum(value) 
+>      + 修改状态值为value
+>      + 通知视图更新
+>
+> 函数组件「或者Hooks组件」不是类组件，所以没有实例的概念「调用组件不再是创建类的实例，而是把函数执行，产生一个私有上下文而已」，再所以，在函数组件中不涉及this的处理！！
+
+```jsx
+import React, { useState } from "react";
+
+export default function Demo() {
+  let [num, setNum] = useState(0);
+  const handler = () => {
+    setNum(num + 1);
+  }
+  return <>
+    <h1>num: {num}</h1>
+    <button onClick={handler}>增加</button>
+  </>
+}
+```
+
+#### 设计原理
+
+函数组件的更新是让函数重新执行，也就是useState会被重新执行；那么它是如何确保每一次获取的是最新状态值，而不是传递的初始值呢？
+
+```jsx
+export default function Demo() { 
+  let [num, setNum] = useState(10);
+  const handler = () => {
+      setNum(100);
+      setTimeout(() => {
+          console.log(num); //10
+      }, 1000);
+  };
+  return <div>
+      <span>{num}</span>
+      <button onClick={handler}>新增</button>
+  </div>;
+}
+```
+
+![image-20240114155944631](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401141559758.png)
+
+#### 实现原理
+
+```js
+var _state;
+function useState(initialValue) {
+  // 这样保证了初始值只会被赋值一次
+  if(typeof _state === 'undefined') {
+    if(typeof initialValue === "function") {
+      _state = initialValue();
+    } else {
+      _state = initialValue;
+    }
+  }
+  var setState = function setState(value) {
+    // 两个值相同，不更新视图
+    if(Object.is(value, _state)) return;
+    if(typeof value === 'function') {
+      _state = value(_state);
+    } else {
+      _state = value;
+    }
+    // 通知视图更新
+  }
+  return [_state, setState];
+  // 返回一个数组，第一个是当前状态，第二个是更新状态的函数
+}
+let [num1, setNum] = useState(0); //num1=0  setNum=setState 0x001
+setNum(100); //=>_state=100 通知视图更新
+// ---
+let [num2, setNum] = useState(0); //num2=100  setNum=setState 0x002
+```
+
+![image-20240114155344027](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401141553216.png)
+
+#### 更新多状态
+
+方案一：类似于类组件中一样，让状态值是一个对象（包含需要的全部状态），每一次只修改其中的一个状态值！
+问题：不能像类组件的setState函数一样，支持部分状态更新！
+
+```jsx
+import React, {useState} from 'react'
+
+export default function Demo() {
+  let [state, setState] = useState({
+      x: 10,
+      y: 20
+  });
+  const handler = () => {
+      // setState({ x: 100 }); //state={x:100} // 这样y会丢失
+      setState({
+          ...state, 
+          x: 100
+      });
+  };
+  return <div>
+      <span>x:{state.x}</span><br/>
+      <span>y:{state.y}</span>
+      <button onClick={handler}>处理</button>
+  </div>;
+}
+```
+
+方案二：执行多次useState，把不同状态分开进行管理「推荐方案」
+
+```jsx
+export default function Demo() {
+  let [x, setX] = useState(10);
+  let [y, setY] = useState(20); 
+  const handler = () => {
+    setX(100);
+  };
+  return <div>
+      <span>x:{x}</span><br/>
+      <span>y:{y}</span>
+      <button onClick={handler}>处理</button>
+  </div>;
+}
+```
+
+#### 更新队列机制
+
+和类组件中的setState一样，每次更新状态值，也不是立即更新，而是加入到更新队列中！
+
+- React 18 全部采用批更新
+- React 16 部分批更新，放在其它的异步操作中，依然是同步操作！
+- 可以基于flushSync刷新渲染队列
+
+![image-20240113215607763](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401132156047.png)
+
+![image-20240113215824212](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401132158328.png)
+
+```jsx
+import React, { useState } from 'react'
+import { flushSync } from 'react-dom'
+
+export default function Demo() {
+  console.log('RENDER渲染');
+  let [x, setX] = useState(10),
+      [y, setY] = useState(20),
+      [z, setZ] = useState(30);
+
+  const handle = () => {
+      flushSync(() => {
+          setX(x + 1);
+          setY(y + 1);
+      });
+      setZ(z + 1);
+  };
+  return <div className="demo">
+      <span className="num">x:{x}</span><br/>
+      <span className="num">y:{y}</span><br/>
+      <span className="num">z:{z}</span><br/>
+      <button type="primary"
+          size="small"
+          onClick={handle}>
+          新增
+      </button>
+  </div>;
+}
+```
+
+![image-20240113220008234](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401132200372.png)
+
+> 在React16中，也和this.setState一样，放在**合成事件/周期函数中，其实异步**的操作;但是放在其它的异步操作中「例如:定时器、手动的事件绑定等」它是**同步**的
+
+![image-20240113220337510](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401132203652.png)
+
+#### 函数式更新
+
+![image-20240113221115132](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401141646433.png)
+
+> 上述代码 最终只会渲染一次render， 最终x是11
+
+如果新的 state 需要通过使用先前的 state 计算得出，那么可以将函数传递给 setState；该函数将接收先前的 state，并返回一个更新后的值！
+
+```jsx
+export default function Demo() {
+  console.log('RENDER渲染');
+  let [x, setX] = useState(10);
+
+  const handle = () => {
+    for(let i = 0; i < 10; i++) {
+      setX(prev => {
+        // prev:存储上一次的状态值
+        console.log(prev);
+        return prev + 1; //返回的信息是我们要修改的状态值
+      })
+    }
+  };
+  return <div className="demo">
+      <span>x: {x}</span>
+      <button type="primary"
+          size="small"
+          onClick={handle}>
+          执行
+      </button>
+  </div>;
+}
+```
+
+#### 性能优化
+
+> useState自带了性能优化的机制:
+>
+> * 每一次修改状态值的时候，会拿最新要修改的值和之前的状态值做比较「基于Object.is作比较」
+> * 如果发现两次的值是一样的，则不会修改状态，也不会让视图更新「可以理解为︰类似于PureComponent，在shouldComponentUpdate中做了浅比较和优化」
+
+![image-20240113223627999](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401132236214.png)
+
+#### 惰性初始state
+
+如果初始 state 需要通过复杂计算获得，则可以传入一个函数，在函数中计算并返回初始的 state，此函数只在初始渲染时被调用！
+
+```jsx
+	let [num, setNum] = useState(() => {
+        let { x, y } = props;
+        return x + y;
+    });
+```
+
+> 此时我们需要对初始值的操作，进行惰性化处理：只有第一次渲染组件处理这些逻辑，以后组件更新，这样的逻辑就不要再运行了！！
+
+### useEffect
+
+> 作用：在函数组件中使用生命周期函数
+> 语法：具备很多情况
+> `useEffect([callback],[dependencies])`
+
+ useEffect：在函数组件中，使用生命周期函数
+
+* `useEffect(callback)`：没设置依赖
+     + **第一次渲染完毕**后，执行callback，等价于 **componentDidMount**
+     + 在组件**每一次更新完毕后**，也会执行callback，等价于 **componentDidUpdate**
+   * `useEffect(callback,[])`：设置了，但是无依赖
+             + 只有**第一次渲染完毕后，才会执行**callback，每一次视图更新完毕后，callback不再执行
+                  + 类似于 **componentDidMount**
+   * `useEffect(callback,[依赖的状态(多个状态)])`：
+           + **第一次渲染完毕会执行**callback
+           + 当依赖的**状态值(或者多个依赖状态中的一个)发生改变**，也会触发callback执行
+             + 但是依赖的状态如果没有变化，在组件更新的时候，callback是不会执行的
+
+* `useEffect(()=>{return 函数})  `
+
+  ```jsx
+  useEffect(()=>{
+        return ()=>{
+          // 返回的小函数，会在组件释放的时候执行
+          // 如果组件更新，会把上一次返回的小函数执行「可以“理解为”上一次渲染的组件释放了」
+        };
+     });
+  ```
+
+```jsx
+import React, { useEffect, useState } from 'react'
+
+export default function Demo() {
+  let [x, setX] = useState(0),
+  [num, setNum] = useState(10);
+
+  useEffect(() => {
+    // 第一次渲染完成和实体更新都会触发
+    // 类似 componentDidMount && componentDidUpdate
+    console.log('@1', num)
+  })
+
+  useEffect(() => {
+    // 第一次渲染完成触发
+    // 类似 componentDidMount
+    console.log('@2', num)
+  }, [])
+
+  useEffect(() => {
+    // 所依赖的num状态发生改变触发
+    console.log('@3', num)
+  }, [num])
+
+  useEffect(() => {
+    return () => {
+    // 组件释放执行
+      // 获取的值还是上一次的
+      console.log('@4', num);
+    }
+  })
+
+  const handle = () => {
+    setNum(num + 1);
+  };
+  const handle2 = () => {
+    setX(x + 1);
+  }
+  return <>
+      <span>{num}</span>
+      <button onClick={handle}>新增num</button>
+      <button onClick={handle2}>新增x</button>
+  </>;
+}
+```
+
+#### useEffect的原理
+
+函数组件在渲染（或更新）期间，遇到useEffect操作，会基于MountEffect方法把callback（和依赖项）加入到`effect链表`中！
+
+在视图渲染完毕后，基于UpdateEffect方法，通知链表中的方法执行！
+1、按照顺序执行期间，首先会检测依赖项的值是否有更新「有容器专门记录上一次依赖项的值」；有更新则把对应的callback执行，没有则继续处理下一项！！
+2、遇到依赖项是空数组的，则只在第一次渲染完毕时，执行相应的callback
+3、遇到没有设置依赖项的，则每一次渲染完毕时都执行相应的callback
+
+……
+
+![image-20240114210717120](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401142107621.png)
+
+#### 注意事项
+
+只能在函数最外层调用 Hook，不要在循环、条件判断或者子函数中调用。
+
+```jsx
+import React, {useEffect, useState} from 'react'
+
+// 模拟从服务器端获取数据
+const queryData = () => {
+  return new Promise(resolve => {
+    setTimeout(() => {
+      resolve([10, 20, 30])
+    }, 2000)
+  })
+}
+
+export default function Demo() {
+  let [num, setNum] = useState(0);
+
+  // 这样会报错
+  // if(num >= 5) {
+  //   useEffect(() => {
+  //     console.log('执行');
+  //   })
+  // }
+
+  useEffect(() => {
+    if(num >= 5) {
+      console.log('执行');
+    }
+  })
+
+  // 这样会报错， 加了async后，返回的是一个promise函数
+  // useEffect如果设置返回值，则返回值必须是一个函数「代表组件销毁时触发」;
+  // 下面案例中，callback经过async的修饰，返回的是一个promise实例，不符合要求！！
+  // useEffect(async () => {
+  //   let res = await queryData();
+  //   console.log(res)
+  // }, [])
+
+  // 推荐用下面的方法
+  useEffect(() => {
+    queryData().then(res => {
+      console.log(res)
+    })
+  }, [])
+
+  // 或者这种方式也行
+  useEffect(() => {
+    const next = async () => {
+      let res = await queryData()
+      console.log(res)
+    }
+    next()
+  })
+
+  const handle = () => {
+    setNum(num + 1); // 更新num的值
+  }
+  return <>
+    <span>{num}</span>
+    <button onClick={handle}>新增num</button>
+  </>;
+}
+```
+
+#### 异步获取数据
+
+不能直接对[callback]设置async，因为它只能返回一个函数（或者不设置返回值）
+
+```jsx
+import React, { useState, useEffect } from "react";
+const queryData = () => {
+    return fetch('/api/subscriptions/recommended_collections')
+        .then(response => {
+            return response.json();
+        });
+};
+export default function Demo() {
+    let [data, setData] = useState([]);
+    /* // Warning: useEffect must not return anything besides a function, which is used for clean-up.
+    useEffect(async () => {
+        let result = await queryData();
+        setData(result);
+        console.log(result);
+    }, []); */
+    useEffect(() => {
+        const next = async () => {
+            let result = await queryData();
+            setData(result);
+            console.log(result);
+        };
+        next();
+    }, []);
+    return <div>
+        ...
+    </div>;
+};
+```
+
+### useLayoutEffect
+
+* 其函数签名与 useEffect 相同，但它会在所有的 DOM 变更之后同步调用 effect。
+* 可以使用它来读取 DOM 布局并同步触发重渲染。
+* 在浏览器执行绘制之前，useLayoutEffect 内部的更新计划将被同步刷新。
+* 尽可能使用标准的 useEffect 以避免阻塞视图更新。
+
+```jsx
+import React, { useState, useEffect, useLayoutEffect } from "react";
+
+
+const Demo = function Demo() {
+    // console.log('RENDER');
+    let [num, setNum] = useState(0);
+
+    // useLayoutEffect(() => {
+    //     if (num === 0) {
+    //         setNum(10);
+    //     }
+    // }, [num]); 
+
+    useLayoutEffect(() => {
+        console.log('useLayoutEffect'); //第一个输出
+    }, [num]);
+    useEffect(() => {
+        console.log('useEffect'); //第二个输出
+    }, [num]);
+
+    return <div
+        style={{
+            backgroundColor: num === 0 ? 'red' : 'green'
+        }}>
+        <span>{num}</span>
+        <button onClick={() => {
+                setNum(0);
+            }}>
+            新增
+        </button>
+    </div>;
+};
+
+export default Demo;
+```
+
+![image-20240114193311496](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401141933776.png)
+
+![image-20240114195007002](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401141950157.png)
+
+> `useLayoutEffect`**会阻塞浏览器渲染真实DOM**，优先执行Effect链表中的callback；
+>
+> `useEffect`**不会阻塞浏览器渲染真实DOM**，在渲染真实DOM的同时，去执行Effect链表中的callback；
+>
+>    + `useLayoutEffect`设置的callback要**优先**于`useEffect`去执行！！
+>    + 两者设置的callback中，依然可以获取DOM元素「原因：真实DOM对象已经创建了，区别只是浏览器是否渲染」
+>    + 如果在callback函数中又修改了状态值「视图又要更新」
+>         + useEffect:浏览器肯定是把第一次的真实已经绘制了，再去渲染第二次真实DOM
+>         + useLayoutEffect:浏览器是把两次真实DOM的渲染，合并在一起渲染的
+>
+>  **视图更新的步骤**：
+>
+> * 第一步：基于babel-preset-react-app把JSX编译为createElement格式
+>
+> *  第二步：把createElement执行，创建出virtualDOM
+>
+> * 第三步：基于root.render方法把virtualDOM变为真实DOM对象「DOM-DIFF」
+>   * useLayoutEffect阻塞第四步操作，先去执行Effect链表中的方法「同步操作」
+>   * useEffect第四步操作和Effect链表中的方法执行，是同时进行的「异步操作」
+> *  第四步：浏览器渲染和绘制真实DOM对象
+
+### useRef
+
+类组件中，我们基于ref可以做的事情:
+
+* 赋值给一个标签︰获取DOM元素
+* 赋值给一个类子组件:获取子组件实例「可以基于实例调用子组件中的属性和方法等」
+* 赋值给一个函数子组件:报错「需要配合React.forwardRet实现ref转发，获取子组件中的摸一个DOM元素」
+
+#### 类组件中ref的使用
+
+ref的使用方法:
+
+* `ref='box'`
+
+  this.refs.box 获取{不推荐使用}
+
+* `ref={x=>this.box=x}`
+
+  this.box获取
+
+* `this.box=React.createRef()`创建一个ref对象
+
+  ==<h2 ref={this.box}>==
+  this.box.current获取DOM元素
+
+#### Hooks函数组件
+
+在函数组件中，可以基于`useRef`获取DOM元素！类似于类组件中的 ：
+
+- `ref={x=>thix.box=x}`
+- `React.createRef`
+
+> `useRef` 只能在函数组件中用「所有的ReactHook函数，都只能在函数组件中时候用，在**类组件中使用会报错**」
+
+```jsx
+function Demo() {
+  let x = useRef(null);
+  let y = React.createRef();
+  let z;
+  useEffect(() => {
+    console.log(x.current, y.current, z)
+  }, [])
+  return <>
+  {/* // Function components cannot have string refs. We recommend using useRef() instead.
+  <span ref="box"></span> */}
+    <ChildDemo1 ref={x}></ChildDemo1>
+    <p ref={y}>父组件的内容</p>
+    <div ref={x => z = x}>这样也可以获取ref</div>
+  </>
+}
+
+// 基于forwardRef实现ref转发，目的：获取子组件内部的某个元素
+const ChildDemo1 = React.forwardRef(function ChildDemo1(props, ref) {
+  // console.log(ref)
+  return <>
+    <span ref={ref}>子组件1</span>
+  </>
+})
+
+export default Demo
+```
+
+> 注意：`React.createRef`在函数组件中依然可以使用！
+>
+> - `createRef` 每次渲染都会返回**一个新的引用**
+> - 而` useRef `每次都会返回**相同的引用**
+
+```jsx
+let prev1;
+let prev2;
+const ChildDemo2 = function ChildDemo2() {
+  let [num, setNum] = useState(0);
+  let x1 = useRef(null);
+  let x2 = React.createRef();
+
+  if(!prev1) {
+    // 第一次DEMO执行，把第一次创建的REF对象赋值给变量
+    prev1 = x1;
+    prev2 = x2;
+  } else {
+    console.log('prev1 === x1', prev1 === x1); // useRef再每一次组件更新的时候（函数重新执行），再次执行useRef方法的时候，不会创建新的REF对象了，获取到的还是第一次创建的那个REF对象！！
+    console.log('prev2 === x2', prev2 === x2); // false createRef在每一次组件更新的时候，都会创建一个全新的REF对象出来，比较浪费性能！！
+    // 总结：在类组件中，创建REF对象，我们基于 React.createRef 处理；但是在函数组件中，为了保证性能，我们应该使用专属的 useRef 处理！！
+  }
+
+  return (<>
+    <div>测试useRef和React.createRef区别</div>
+    <span>num: {num}</span>
+    <button onClick={
+      () => {
+        setNum(num + 1)
+      }
+    }>新增</button>
+  </>)
+}
+```
+
+### useImperativeHandle
+
+> useImperativeHandle 可以让你在使用 **ref 时自定义暴露给父组件的实例值**，应当与 forwardRef 一起使用，实现ref转发！
+
+```jsx
+import React, { useImperativeHandle, useRef, useState } from "react";
+
+class ClassChild extends React.Component {
+   state = {
+    num: 1
+   }
+
+  submit = () => {
+    console.log('调用了子类的方法')
+  }
+  add = () => {
+    this.setState({
+      num: this.state.num + 1
+    })
+  }
+  render() {
+    let { num } = this.state
+    return <>
+      <h2>类组件</h2>
+      <p>num: {num} </p>
+      <button onClick={this.add}>子组件自调用点击加加</button>
+    </>
+  }
+}
+
+const FunDemo = React.forwardRef(function FunDemo(props, ref) {
+  let [num, setNum] = useState(0)
+  useImperativeHandle(ref, () => {
+    // 在这里返回的内容，都可以被父组件的REF对象获取到
+    return {
+      num,
+      add
+    }
+  })
+
+  const add = () => {
+    console.log('函数子组件add方法执行')
+    setNum(num + 1)
+  }
+  return <>
+    <h2>函数子组件</h2>
+    <p>num: {num} </p>
+    <button onClick={add}>子组件自调用点击加加</button>
+  </>
+})
+
+const Demo = function Demo() {
+  let child1 = useRef(null);
+  let child2 = useRef(null);
+  return <>
+    <h1>函数式父组件</h1>
+    <button onClick={() => {
+      child1.current.add()
+    }}>调用类组件中的方法</button>
+    <button onClick={() => {
+      child2.current.add()
+    }}>调用函数组件中的方法</button>
+    <div style={{width: 300, height: 300, border: '1px solid #ccc'}}>
+      <ClassChild ref={child1}></ClassChild>
+    </div>
+    <div style={{width: 300, height: 300, border: '1px solid #ccc'}}>
+      <FunDemo ref={child2}></FunDemo>
+    </div>
+    
+  </>
+}
+
+
+export default Demo;
+```
+
+![image-20240115205712806](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401152057320.png)
+
+### useMemo
+
+在前端开发的过程中，我们需要缓存一些内容，以避免在需渲染过程中因大量不必要的耗时计算而导致的性能问题。为此 React 提供了一些方法可以帮助我们去实现数据的缓存，useMemo 就是其中之一！
+
+> `let xxx = useMemo(callback,[dependencies])`
+>
+>    + 第一次渲染组件的时候，callback会执行
+>    + 后期只有依赖的状态值发生改变，callback才会再执行
+>    + 每一次会把callback执行的返回结果赋值给xxx
+>    + useMemo具备“计算缓存”，在依赖的状态值没有发生改变，callback没有触发执行的时候，xxx获取的是上一次计算出来的结果
+>       和Vue中的计算属性非常的类似！！
+
+![image-20240117161048101](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401171610343.png)
+
+```jsx
+import React, { useEffect, useMemo, useState } from "react";
+
+export default function Demo() {
+  let [supNum, setSupNum] = useState(0);
+  let [oppNum, setOppNum] = useState(0);
+  let [x, setX] = useState(0);
+  
+
+  // // 计算支持比率
+  // let total = supNum + oppNum, ratio = '--';
+  // if(total > 0) {
+  //   console.log('当x++的时候，我也会执行')
+  //   ratio = (supNum / (total)).toFixed(2);
+  // }
+
+  let ratio = useMemo(() => {
+    let ratio = '--';
+    let total = supNum + oppNum;
+    if(total > 0) {
+      ratio = (supNum / (total)).toFixed(2);
+    }
+    console.log('我只有在supNum和oppNum改变的时候，才会触发')
+    return ratio;
+  }, [supNum, oppNum])
+
+  // let ratio = '--';
+  // let [ratio, setRatio] = useState('--');
+  // useEffect(() => {
+  //   let total = supNum + oppNum;
+  //   if(total > 0) {
+  //     ratio = (supNum / (total)).toFixed(2);
+  //   }
+  //   setRatio(ratio) // 需要添加这个才会重新渲染
+  //   console.log('支持率将重新计算，但是ratio是不会重新渲染的')
+  // }, [supNum, oppNum])
+
+  
+  
+  return <>
+    <div className="main">
+      <p>支持人数：{supNum}人</p>
+      <p>反对人数：{oppNum}人</p>
+      <p>支持比率：{ratio}</p>
+      <p>x: {x}</p>
+    </div>
+    <div className="footer">
+      <button onClick={() => {
+        setSupNum(supNum + 1);
+      }}>支持</button>
+      <button onClick={() => {
+        setOppNum(oppNum + 1);
+      }}>反对</button>
+      <button onClick={() => {
+        setX(x + 1);
+      }}>x++</button>
+    </div>
+  </>
+}
+```
+
+![image-20240117163115193](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401171631397.png)
+
+
+> 比较两种方法的主要区别是，`useMemo`适用于记忆函数的计算结果，而`useEffect`用于处理副作用。在某些情况下，`useMemo`更适合计算值的情景，因为它是专门为此而设计的。而`useEffect`则更适用于**处理那些不直接影响渲染结果**但需要在数据变化时执行的任务。
+
+### useCallback
+
+useCallback 用于得到一个固定引用值的函数，通常用它进行性能优化！
+
+>  `const xxx = useCallback(callback,[dependencies])`
+>    + 组件第一次渲染，useCallback执行，创建一个函数“callback”，赋值给xxx
+>    + 组件后续每一次更新，判断依赖的状态值是否改变，如果改变，则重新创建新的函数堆，赋值给xxx；但是如果，依赖的状态没有更新「或者没有设置依赖“[]”」则xxx获取的一直是第一次创建的函数堆，不会创建新的函数出来！！
+>    + 或者说，基于useCallback，可以始终获取第一次创建函数的堆内存地址(或者说函数的引用)
+
+![image-20240117164256263](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401171642405.png)
+诉求：当父组件更新的时候，因为传递给子组件的属性仅仅是一个函数「特点：基本应该算是不变的」，所以不想再让子组件也跟着更新了！
+
+* 第一条：传递给子组件的属性（函数），每一次需要是相同的堆内存地址(是一致的)。基于useCallback处理！！
+* 第二条：在子组件内部也要做一个处理，验证父组件传递的属性是否发生改变，如果没有变化，则让子组件不能更新，有变化才需要更新。继承`React.PureComponent`即可「在shouldComponentUpdate中对新老属性做了浅比较」!! **函数组件**是基于 `React.memo` 函数，对新老传递的属性做比较，如果不一致，才会把函数组件执行，如果一致，则不让子组件更新！！
+
+```jsx
+  // const handler = () => {} //第一次:0x001  第二次:0x101  第三次:0x201 ...
+  const handler = useCallback(() => {}, []) //第一次:0x001  第二次:0x001  第三次:0x
+  if(!prev) {
+    prev = handler;
+  } else {
+    console.log(prev === handler) // 每次都会创建新的函数
+  }
+```
+
+![image-20240118163417386](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401181634861.png)
+
+```jsx
+class Child extends React.PureComponent {
+  render() {
+    console.log('类子组件渲染');
+    return <div>类子组件</div>;
+  }
+}
+
+const Child2 = React.memo(function Child2() {
+  console.log('函数子组件渲染')
+  return <>
+    <div>函数子组件</div>
+  </>
+})
+
+
+let prev;
+export default function Demo() {
+  let [x, setX] = useState(0);
+
+  // const handler = () => {} //第一次:0x001  第二次:0x101  第三次:0x201 ...
+  const handler = useCallback(() => {}, []) //第一次:0x001  第二次:0x001  第三次:0x
+  if(!prev) {
+    prev = handler;
+  } else {
+    console.log(prev === handler) // 每次都会创建新的函数
+  }
+  const add = () => {
+    setX(x++);
+  }
+  return <>
+    <p>x: {x}</p>
+    <Child handler={handler}></Child>
+    <Child2 handler={handler}></Child2>
+    <button onClick={add}>x++</button>
+  </>
+}
+```
+
+![image-20240118163548033](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401181635158.png)
+
+### 自定义Hook
+
+使用自定义hook可以将某些组件逻辑提取到可重用的函数中
+
+```jsx
+import React, { useEffect, useState } from 'react'
+
+/* 
+自定义Hook 
+  作用：提取封装一些公共的处理逻辑
+  玩法：创建一个函数，名字需要是 useXxx ，后期就可以在组件中调用这个方法！
+*/
+const usePartialState = function usePartialState(initialValue) {
+  let [state, setState] = useState(initialValue);
+  // setState:不支持部分状态更改的
+  // setPartial:我们期望这个方法可以支持部分状态的更改
+  const setPartial = function setPartial(partialState) {
+    setState((state) => ({ ...state, ...partialState }));
+  }
+  return [state, setPartial];
+}
+
+// 自定义Hook，在组件第一次渲染完毕后，统一干点啥事
+const useDidMount = function useDidMount(title) {
+  if(!title) title = '哈哈哈'
+  // 基于React内置的Hook函数，实现需求即可
+  useEffect(() => {
+    document.title = title;
+  }, [])
+}
+
+
+
+export default function Demo() {
+  // let [state, setState] = useState({
+  //   supNum: 10,
+  //   oppNum: 5
+  // })
+  // 如果是对象形式，修改其中的一个值，必须把原来的值赋值一份，否则会其他值会丢失
+  // const handle = (type) => {
+  //   if(type === 'sup') {
+  //     setState({
+  //       ...state,
+  //       supNum: state.supNum + 1
+  //     })  
+  //   } else {
+  //     setState({
+  //       ...state,
+  //       oppNum: state.oppNum + 1
+  //     })
+  //   }
+  // }
+  let [state, setPartial] = usePartialState({
+      supNum: 10,
+      oppNum: 5
+  });
+
+  const handle = (type) => {
+      if (type === 'sup') {
+          setPartial({
+              supNum: state.supNum + 1
+          });
+          return;
+      }
+      setPartial({
+          oppNum: state.oppNum + 1
+      });
+  };
+
+  useDidMount('哈哈哈哈哈');
+  return <div className="vote-box">
+  <div className="main">
+      <p>支持人数：{state.supNum}人</p>
+      <p>反对人数：{state.oppNum}人</p>
+  </div>
+  <div className="footer">
+      <button type="primary" onClick={handle.bind(null, 'sup')}>支持</button>
+      <button type="primary" danger onClick={handle.bind(null, 'opp')}>反对</button>
+  </div>
+</div>;
+}
+```
+
+## React 复合组件通信方案
+
+### 基于props属性，实现父子(或兄弟)组件间的通信
+
+![下载](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401202056305.png)
+
+基本结构
+
+![image-20240119194428368](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401191944516.png)
+
+#### 类组件
+
+![image-20240119195321895](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401191953075.png)
+
+Vote.jsx
+
+```jsx
+import React from "react";
+import './Vote.less';
+import VoteMain from './VoteMain';
+import VoteFooter from './VoteFooter';
+
+class Vote extends React.Component {
+    state = {
+        supNum: 10,
+        oppNum: 0
+    }
+    // 设置为箭头函数：不论方法在哪执行的，方法中的this永远都是Vote父组件的实例
+    change = (type) => {
+        let { supNum, oppNum} = this.state
+        if(type === 'sup') {
+            this.setState({
+                supNum: supNum + 1
+            })
+            return;
+        }
+        this.setState({oppNum: oppNum + 1})
+    }
+    render() {
+        let {supNum, oppNum} = this.state;
+        return <div className="vote-box">
+            <div className="header">
+                <h2 className="title">React是很棒的前端框架</h2>
+                <span className="num">{supNum + oppNum}</span>
+            </div>
+            <VoteMain supNum={supNum} oppNum={oppNum} />
+            <VoteFooter change={this.change} />
+        </div>;
+    }
+}
+
+export default Vote;
+```
+
+VoteMain.jsx
+
+```jsx
+import React from "react";
+import PropTypes  from 'prop-types'
+
+
+class VoteMain extends React.Component {
+    /* 属性规则校验 */
+    static defaultProps = {
+        supNum: 0,
+        oppNum: 0
+    };
+    static propTypes = {
+        supNum: PropTypes.number.isRequired,
+        oppNum: PropTypes.number.isRequired
+    };
+
+    render() {
+        let { supNum, oppNum } = this.props;
+        console.log(supNum, oppNum);
+        let ratio = '--',
+        total = supNum + oppNum;
+        if (total > 0) ratio = (supNum / total * 100).toFixed(2) + '%';
+        return <div className="main">
+            <p>支持人数：{supNum}人</p>
+            <p>反对人数：{oppNum}人</p>
+            <p>支持比率：{ratio}</p>
+        </div>;
+    }
+}
+
+export default VoteMain;
+```
+
+VoteFooter.jsx
+
+```jsx
+import React from "react";
+import { Button } from 'antd';
+
+class VoteFooter extends React.Component {
+    render() {
+        let {change} = this.props;
+        return <div className="footer">
+            <Button type="primary" onClick={change.bind(null, 'sup')}>支持</Button>
+            <Button type="primary" onClick={change.bind(null, 'opp')} danger>反对</Button>
+        </div>;
+    }
+}
+
+export default VoteFooter;
+```
+
+![image-20240119195920023](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401191959307.png)
+
+![image-20240119200350935](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401192003162.png)
+
+![image-20240119200728342](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401192007493.png)
+
+> 理解一：属性的传递方向是单向的
+>
+> - 父组件可基于属性把信息传给子组件
+> - 子组件无法基于属性给父组件传信息；但可以把父组件传递的方法执行，从而实现子改父！
+>
+> 理解二：关于生命周期函数的延续
+>
+> - 组件第一次渲染
+>   - 父 willMount -> 父 render
+>   - 子 willMount -> 子 render -> 子 didMount
+>   - 父 didMount
+> - 组件更新
+>   - 父 shouldUpdate -> 父 willUpdate -> 父 render
+>   - 子 willReciveProps -> 子 shouldUpdate -> 子 willUpdate -> 子 render -> 子 didUpdate
+>   - 父 didUpdate
+
+#### 函数组件
+
+![image-20240119204332402](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401192043727.png)
+
+Vote.jsx
+
+```jsx
+import React, { useCallback, useState } from "react";
+import './Vote.less';
+import VoteMain from './VoteMain';
+import VoteFooter from './VoteFooter';
+
+const Vote = function Vote() {
+    let [supNum, setSupNum] = useState(10);
+    let [oppNum, setOppNum] = useState(0);
+    const change = useCallback((type)=> {
+        if(type === 'sup') {
+            setSupNum(supNum + 1);
+        }else {
+            setOppNum(oppNum + 1);
+        }
+    }, [supNum, oppNum])
+    return <div className="vote-box">
+        <div className="header">
+            <h2 className="title">React是很棒的前端框架</h2>
+            <span className="num">{supNum + oppNum}</span>
+        </div>
+        <VoteMain supNum={supNum} oppNum = {oppNum} />
+        <VoteFooter change={change} />
+    </div>;
+};
+
+export default Vote;
+```
+
+VoteMain.jsx
+
+```jsx
+import React, { useMemo } from "react";
+import {PropTypes} from 'prop-types'
+
+const VoteMain = function VoteMain(props) {
+    let {supNum, oppNum} = props;
+    let ratio = '--'
+    ratio = useMemo(() => {
+        let ratio = '--',
+        total = supNum + oppNum;
+        if (total > 0) ratio = (supNum / total * 100).toFixed(2) + '%';
+        return ratio;
+    }, [supNum, oppNum])
+    return <div className="main">
+        <p>支持人数：{supNum}人</p>
+        <p>反对人数：{oppNum}人</p>
+        <p>支持比率：{ratio}</p>
+    </div>;
+};
+// 规则属性校验
+VoteMain.defaultProps = {
+    supNum: 0,
+    oppNum: 0
+}
+VoteMain.propTypes = {
+    supNum: PropTypes.number,
+    oppNum: PropTypes.number
+}
+export default VoteMain;
+```
+
+VoteFooter.jsx
+
+```jsx
+import React from "react";
+import { Button } from 'antd';
+import PropTypes from 'prop-types';
+
+const VoteFooter = function VoteFooter(props) {
+    let {change} = props
+    return <div className="footer">
+        <Button type="primary" onClick={change.bind(null, 'sup')}>支持</Button>
+        <Button type="primary" onClick={change.bind(null, 'opp')} danger>反对</Button>
+    </div>;
+};
+// 规则属性校验
+VoteFooter.defaultProps = {}
+VoteFooter.propTypes = {
+    change: PropTypes.func.isRequired
+}
+
+export default VoteFooter;
+```
+
+![image-20240119212057789](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401192120974.png)
+
+### 基于context上下文，实现祖先/后代(或平行)组件间的通信
+
+![下载](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401252259137.png)
+
+1.创建上下文对象
+
+ThemeContext.js
+
+```javascript
+import React from "react";
+const ThemeContext = React.createContext();
+export default ThemeContext;
+```
+
+#### 类组件
+
+![image-20240125231240954](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401252312156.png)
+
+![image-20240125231929394](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401252319577.png)
+
+![image-20240125232134183](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401252321362.png)
+
+Vote.jsx
+
+```jsx
+import React from "react";
+import './Vote.less';
+import VoteMain from './VoteMain';
+import VoteFooter from './VoteFooter';
+import ThemeContext from "../../ThemeContext";
+
+class Vote extends React.Component {
+    state = {
+        supNum: 10,
+        oppNum: 0
+    }
+    // 设置为箭头函数：不论方法在哪执行的，方法中的this永远都是Vote父组件的实例
+    change = (type) => {
+        let { supNum, oppNum} = this.state
+        if(type === 'sup') {
+            this.setState({
+                supNum: supNum + 1
+            })
+            return;
+        }
+        this.setState({oppNum: oppNum + 1})
+    }
+    render() {
+        let {supNum, oppNum} = this.state;
+        return <ThemeContext.Provider value={{
+            supNum,
+            oppNum,
+            change: this.change
+        }}>
+            <div className="vote-box">
+                <div className="header">
+                    <h2 className="title">React是很棒的前端框架</h2>
+                    <span className="num">{supNum + oppNum}</span>
+                </div>
+                <VoteMain/>
+                <VoteFooter/>
+            </div>
+        </ThemeContext.Provider>;
+    }
+}
+
+export default Vote;
+```
+
+VoteMain.jsx
+
+```jsx
+import React from "react";
+import ThemeContext from "../../ThemeContext";
+
+class VoteMain extends React.Component {
+    render() {
+        return <ThemeContext.Consumer>
+            {
+                context => {
+                    let {supNum, oppNum} = context
+                    return <div className="main">
+                        <p>支持人数：{supNum}人</p>
+                        <p>反对人数：{oppNum}人</p>
+                        <p>支持比率：--</p>
+                    </div>
+                }
+            }
+        </ThemeContext.Consumer>
+    }
+}
+
+export default VoteMain;
+```
+
+VoteFooter.jsx
+
+```jsx
+import React from "react";
+import { Button } from 'antd';
+import ThemeContext from "../../ThemeContext";
+
+// class VoteFooter extends React.Component {
+//     render() {
+//         return <ThemeContext.Consumer>
+//             {
+//                 context => {
+//                     let {change} = context
+//                     return <div className="footer">
+//                         <Button type="primary" onClick={change.bind(null, 'sup')}>支持</Button>
+//                         <Button type="primary" onClick={change.bind(null, 'opp')} danger>反对</Button>
+//                     </div>; 
+//                 }
+//             }
+//         </ThemeContext.Consumer>
+//     }
+// }
+
+// 方案二
+class VoteFooter extends React.Component {
+    static contextType = ThemeContext;
+    render() {
+        let {change} = this.context
+        return <div className="footer">
+            <Button type="primary" onClick={change.bind(null, 'sup')}>支持</Button>
+            <Button type="primary" onClick={change.bind(null, 'opp')} danger>反对</Button>
+        </div>; 
+    }
+}
+
+export default VoteFooter;
+```
+
+#### 函数组件
+
+Vote.jsx
+
+```jsx
+import React, { useCallback, useState } from "react";
+import './Vote.less';
+import VoteMain from './VoteMain';
+import VoteFooter from './VoteFooter';
+import ThemeContext from "../../ThemeContext";
+
+const Vote = function Vote() {
+    let [supNum, setSupNum] = useState(10);
+    let [oppNum, setOppNum] = useState(0);
+    const change = useCallback((type)=> {
+        if(type === 'sup') {
+            setSupNum(supNum + 1);
+        }else {
+            setOppNum(oppNum + 1);
+        }
+    }, [supNum, oppNum])
+    return (
+        <ThemeContext.Provider value={{
+            supNum,
+            oppNum,
+            change
+        }}>
+            <div className="vote-box">
+                <div className="header">
+                    <h2 className="title">React是很棒的前端框架</h2>
+                    <span className="num">{supNum + oppNum}</span>
+                </div>
+                <VoteMain supNum={supNum} oppNum = {oppNum} />
+                <VoteFooter change={change} />
+            </div>
+        </ThemeContext.Provider>
+    )
+};
+
+export default Vote;
+```
+
+VoteMain.jsx
+
+```jsx
+import React, { useContext, useMemo } from "react";
+import ThemeContext from "../../ThemeContext";
+
+const VoteMain = function VoteMain() {
+    // 获取上下文中的信息
+    let {supNum, oppNum} = useContext(ThemeContext);
+    let ratio = useMemo(() => {
+        let total = supNum + oppNum;
+        return total > 0 ? (supNum / total * 100).toFixed(2) + '%' : '--';
+    }, [supNum, oppNum]);
+    return <div className="main">
+        <p>支持人数：{supNum}人</p>
+        <p>反对人数：{oppNum}人</p>
+        <p>支持比率：{ratio}</p>
+    </div>;
+};
+export default VoteMain;
+```
+
+VoteFooter.jsx
+
+```jsx
+import React, { useContext } from "react";
+import { Button } from 'antd';
+import ThemeContext from "../../ThemeContext";
+
+const VoteFooter = function VoteFooter() {
+    let {change} = useContext(ThemeContext);
+    return <div className="footer">
+        <Button type="primary" onClick={change.bind(null, 'sup')}>支持</Button>
+        <Button type="primary" onClick={change.bind(null, 'opp')} danger>反对</Button>
+    </div>;
+};
+export default VoteFooter;
+```
+
+> 真实项目中
+>
+> - 父子通信（或具备相同父亲的兄弟组件）：我们一般都是基于props属性实现
+> - 其他组件之间的通信：我们都是基于 redux / react-redux 或者 mobx 去实现
+
+## React样式的处理方案
+
+在vue开发中，我们可以基于`scoped`为组件设置样式私有化！
+
+```vue
+<style lang="less" scoped>
+.banner-box {
+  box-sizing: border-box;
+  height: 375px;
+  background: #eee;
+  overflow: hidden;
+}
+:deep(.van-swipe__indicators) {
+    left: auto;
+    right: 20px;
+    transform: none;
+}
+</style>
+```
+
+![下载](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401262340036.png)
+
+但是react项目中并没有类似于这样的机制！如果我们想保证“团队协作开发”中，各组件间的样式不冲突，我们则需要基于特定的方案进行处理！
+
+### 内联样式
+
+内联样式就是在JSX元素中，直接定义行内的样式
+
+```jsx
+// 调用组件的时候 <Demo color="red" />
+import React from 'react';
+const Demo = function Demo(props) {
+    const titleSty = {
+        color: props.color,
+        fontSize: '16px'
+    };
+    const boxSty = {
+        width: '300px',
+        height: '200px'
+    };
+    return <div style={boxSty}>
+        <h1 style={titleSty}>1111</h1>
+        <h2 style={{ ...titleSty, fontSize: '14px' }}>2222</h2>
+    </div>;
+};
+export default Demo;
+```
+
+编译后的内容
+
+```html
+<div style="width: 300px; height: 200px;">
+    <h1 style="color: red; font-size: 16px;">珠峰培训</h1>
+    <h2 style="color: red; font-size: 14px;">珠峰培训</h2>
+</div>
+```
+
+内联样式的优点：
+
+- **使用简单：** 简单的以组件为中心来实现样式的添加
+- **扩展方便：** 通过使用对象进行样式设置，可以方便的扩展对象来扩展样式
+- **避免冲突：** 最终都编译为元素的行内样式，不存在样式冲突的问题
+
+在大型项目中，内联样式可能并不是一个很好的选择，因为内联样式还是有局限性的：
+
+- **不能使用伪类：** 这意味着 :hover、:focus、:actived、:visited 等都将无法使用
+- **不能使用媒体查询：** 媒体查询相关的属性不能使用
+- **减低代码可读性：** 如果使用很多的样式，代码的可读性将大大降低
+- **没有代码提示：** 当使用对象来定义样式时，是没有代码提示的
+
+### 使用CSS样式表
+
+CSS样式表应该是我们最常用的定义样式的方式！但多人协作开发中，很容易导致组件间的样式类名冲突，从而导致样式冲突；所以此时需要我们 `人为有意识的` 避免冲突！
+
+- 保证组件最外层样式类名的唯一性，例如：`路径名称 + 组件名称` 作为样式类名
+- 基于 less、sass、stylus 等css预编译语言的`嵌套功能`，保证组件后代元素的样式，都嵌入在外层样式类中！！
+
+Demo.less
+
+```less
+.personal-box {
+    width: 300px;
+    height: 200px;
+    .title {
+        color: red;
+        font-size: 16px;
+    }
+    .sub-title {
+        .title;
+        font-size: 14px;
+    }
+}
+```
+
+Demo.jsx
+
+```jsx
+import React from 'react';
+import './Demo.less';
+const Demo = function Demo(props) {
+    return <div className='personal-box'>
+        <h1 className='title'>111</h1>
+        <h2 className='sub-title'>222</h2>
+    </div>;
+};
+export default Demo;
+```
+
+CSS样式表的优点：
+
+- **结构样式分离：** 实现了样式和JavaScript的分离
+- **使用CSS所有功能：** 此方法允许我们使用CSS的任何语法，包括伪类、媒体查询等
+- **使用缓存：** 可对样式文件进行强缓存或协商缓存
+- **易编写**：CSS样式表在书写时会有代码提示
+
+当然，CSS样式表也是有缺点的：
+
+- **产生冲突：** CSS选择器都具有相同的全局作用域，很容易造成样式冲突
+- **性能低：** 预编译语言的嵌套，可能带来的就是超长的`选择器前缀`，性能低！
+- **没有真正的动态样式：** 在CSS表中难以实现动态设置样式
+
+### CSS Modules
+
+CSS的规则都是全局的，任何一个组件的样式规则，都对整个页面有效；产生局部作用域的唯一方法，就是使用一个独一无二的class名字；这就是 CSS Modules 的做法！
+
+第一步：创建 xxx.module.css
+
+```css
+.personal {
+  width: 300px;
+  height: 200px;
+}
+.personal span {
+  color: green;
+}
+.title {
+  color: red;
+  font-size: 16px;
+}
+.subTitle {
+  color: red;
+  font-size: 14px;
+}
+```
+
+第二步：导入样式文件 & 调用
+
+```jsx
+import React from 'react';
+import sty from './css/demo.module.css';
+const Demo = function Demo() {
+    return <div className={sty.personal}>
+        <h1 className={sty.title}>111</h1>
+        <h2 className={sty.subTitle}>222</h2>
+        <span>文字</span>
+    </div>;
+};
+export default Demo;
+```
+
+![image-20240127231139428](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401272311525.png)
+
+编译后的效果
+
+```html
+// 结构
+<div class="demo_personal__dlx2V">
+    <h1 class="demo_title__tN+WF">111</h1>
+    <h2 class="demo_subTitle__rR4WF">222</h2>
+    <span>文字</span>
+</div>
+
+// 样式
+.demo_personal__dlx2V {
+    height: 200px;
+    width: 300px
+}
+.demo_personal__dlx2V span {
+    color: green
+}
+.demo_title__tN\+WF {
+    color: red;
+    font-size: 16px
+}
+.demo_subTitle__rR4WF {
+    color: red;
+    font-size: 14px
+}
+```
+
+react 脚手架中对 CSS Modules 的配置
+
+```js
+// react-dev-utils/getCSSModuleLocalIdent.js
+const loaderUtils = require('loader-utils');
+const path = require('path');
+module.exports = function getLocalIdent(
+  context,
+  localIdentName,
+  localName,
+  options
+) {
+  // Use the filename or folder name, based on some uses the index.js / index.module.(css|scss|sass) project style
+  const fileNameOrFolder = context.resourcePath.match(
+    /index\.module\.(css|scss|sass)$/
+  )
+    ? '[folder]'
+    : '[name]';
+  // Create a hash based on a the file location and class name. Will be unique across a project, and close to globally unique.
+  const hash = loaderUtils.getHashDigest(
+    path.posix.relative(context.rootContext, context.resourcePath) + localName,
+    'md5',
+    'base64',
+    5
+  );
+  // Use loaderUtils to find the file or folder name
+  const className = loaderUtils.interpolateName(
+    context,
+    fileNameOrFolder + '_' + localName + '__' + hash,
+    options
+  );
+  // Remove the .module that appears in every classname when based on the file and replace all "." with "_".
+  return className.replace('.module_', '_').replace(/\./g, '_');
+};
+```
+
+#### 全局作用域
+
+CSS Modules 允许使用 :global(.className) 的语法，声明一个全局规则。凡是这样声明的class，都不会被编译成哈希字符串。
+
+```css
+// xxx.module.css
+:global(.personal) {
+    width: 300px;
+    height: 200px;
+}
+
+// xxx.jsx
+const Demo = function Demo() {
+    return <div className='personal'>
+        ...
+    </div>;
+};
+```
+
+#### class继承/组合
+
+在 CSS Modules 中，一个选择器可以继承另一个选择器的规则，这称为”组合”
+
+```css
+// xxx.module.css
+.title {
+    color: red;
+    font-size: 16px;
+}
+.subTitle {
+    composes: title;
+    font-size: 14px;
+}
+
+<h1 class="demo_title__tN+WF">111</h1>
+<h2 class="demo_subTitle__rR4WF">222</h2>
+
+
+// 组件还是正常的调用，但是编译后的结果
+<h1 class="demo_title__tN+WF">111</h1>
+<h2 class="demo_subTitle__rR4WF demo_title__tN+WF">222</h2>
+```
+
+![image-20240127232112585](https://trpora-1300527744.cos.ap-chongqing.myqcloud.com/img/202401272321706.png)

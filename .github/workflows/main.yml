@@ -51,18 +51,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout master
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v2
+      - name: install Node.js # 任务的名字，可任意
+        uses: actions/setup-node@v2.5.0 # 可以在右边搜
         with:
-          ref: master
-
-      - name: Setup node
-        uses: actions/setup-node@v1
-        with:
-          node-version: "10.x"
-
-      - name: Build project
-        run: yarn && yarn build
+          node-version: "18.18.0" # 版本
+      - name: install dep
+        run: npm install # 任务运行的命令
+      - name: build app
+        run: npm run buildLinux
 
       - name: Upload COS
         uses: zkqiang/tencent-cos-action@v0.1.0

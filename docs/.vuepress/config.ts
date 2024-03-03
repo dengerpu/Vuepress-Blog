@@ -130,7 +130,7 @@ export default defineConfig4CustomTheme<VdoingThemeConfig>({
         ],
       },
       {
-        text: '📖前端小课程',link: '/course/',
+        text: '前端小课程',link: '/course/',
         items: [
           { text: '柯里化', link: '/pages/101b26/' }
         ]

@@ -1,11 +1,11 @@
 ---
 home: true
 # heroImage: /img/web.png
-heroText: 爱写bug的小邓程序员
+heroText: 🚀爱写bug的小邓程序员
 tagline: Web前端技术博客，积跬步以至千里，致敬每个爱学习的你。
-# actionText: 立刻进入 →
-# actionLink: /web/
-bannerBg: /img/bg.png
+actionText: 立刻进入 →
+actionLink: /web/
+bannerBg: 'none'
 
 features: # 可选的
   - title: 前端
@@ -27,6 +27,46 @@ features: # 可选的
 # hideRightBar: true # 是否隐藏右侧边栏
 ---
 
+<style>
+:root {
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: -webkit-linear-gradient(120deg, #bd34fe 30%, #41d1ff);
 
-<!-- 小熊猫 -->
-<img src="/img/panda-waving.png" class="panda no-zoom" style="width: 130px;height: 115px;opacity: 0.8;margin-bottom: -4px;padding-bottom:0;position: fixed;bottom: 0;left: 0.5rem;z-index: 1;">
+  --vp-home-hero-image-background-image: linear-gradient(-45deg, #bd34fe 50%, #47caff 50%);
+  --vp-home-hero-image-filter: blur(44px);
+}
+.banner-conent {
+  /* display: flex; */
+}
+.banner {
+  /* background: linear-gradient(to bottom, #f1f1f1 0%, #ffffff 100%)!important; */
+  /* background: linear-gradient(to right, #e0eafc, #cfdef3)!important; */
+  background: linear-gradient(to right, #bd34fe, #47caff)!important;
+  backdrop-filter: blur(var(--vp-home-hero-image-filter));
+  /* background: var(--vp-home-hero-image-background-image)!important;
+  backdrop-filter: blur(var(--vp-home-hero-image-filter));
+  -webkit-backdrop-filter: blur(var(--vp-home-hero-image-filter)); */
+}
+#main-title {
+  color: transparent;
+  background: var(--vp-home-hero-name-background);
+  -webkit-background-clip: text; /* WebKit浏览器的前缀 */
+  background-clip: text;
+}
+
+.icon{
+  font-size: 30px;
+}
+
+@media (min-width: 640px) {
+  :root {
+    --vp-home-hero-image-filter: blur(56px);
+  }
+}
+
+@media (min-width: 960px) {
+  :root {
+    --vp-home-hero-image-filter: blur(68px);
+  }
+}
+</style>

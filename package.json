@@ -1,5 +1,5 @@
 {
-  "name": "theme-vdoing-blog",
+  "name": "ep-blog",
   "version": "1.0.0",
   "scripts": {
     "dev": "set NODE_OPTIONS=--openssl-legacy-provider && node --max_old_space_size=102400 ./node_modules/vuepress/cli.js dev docs",

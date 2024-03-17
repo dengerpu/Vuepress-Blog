@@ -1,7 +1,7 @@
 ---
 home: true
 # heroImage: /img/web.png
-heroText: 🚀爱写bug的小邓程序员
+heroText: 爱写bug的小邓程序员
 tagline: Web前端技术博客，积跬步以至千里，致敬每个爱学习的你。
 actionText: 立刻进入 →
 actionLink: /web/
@@ -35,23 +35,20 @@ features: # 可选的
   --vp-home-hero-image-background-image: linear-gradient(-45deg, #bd34fe 50%, #47caff 50%);
   --vp-home-hero-image-filter: blur(44px);
 }
-.banner-conent {
-  /* display: flex; */
-}
 .banner {
-  /* background: linear-gradient(to bottom, #f1f1f1 0%, #ffffff 100%)!important; */
-  /* background: linear-gradient(to right, #e0eafc, #cfdef3)!important; */
-  background: linear-gradient(to right, #bd34fe, #47caff)!important;
+  background: rgb(217,231,255)!important;
+  background: linear-gradient(180deg, rgba(217,231,255,1) 0%, rgba(227,255,231,0.6) 70%,  rgba(236,249,238, 0.5) 80%, rgba(244, 244, 244, 0.5) 90%)!important;
   backdrop-filter: blur(var(--vp-home-hero-image-filter));
-  /* background: var(--vp-home-hero-image-background-image)!important;
-  backdrop-filter: blur(var(--vp-home-hero-image-filter));
-  -webkit-backdrop-filter: blur(var(--vp-home-hero-image-filter)); */
 }
 #main-title {
   color: transparent;
   background: var(--vp-home-hero-name-background);
   -webkit-background-clip: text; /* WebKit浏览器的前缀 */
   background-clip: text;
+}
+#main-title:before{
+  content: "🚀";
+  color: black;
 }
 
 .icon{

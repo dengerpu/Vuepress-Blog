@@ -56,7 +56,7 @@ export default defineConfig4CustomTheme<VdoingThemeConfig>({
         ],
       },
       {
-        text: '💻后端',
+        text: '后端',
         link: '/backend/',
         items: [
           { text: 'Java基础', link: '/pages/a598af/' },
@@ -79,7 +79,7 @@ export default defineConfig4CustomTheme<VdoingThemeConfig>({
         ],
       },
       {
-        text: '🛠️项目实战',
+        text: '项目实战',
         link: '/item/',
         items: [
           { text: '大屏', link: '/pages/409542/' },
@@ -87,11 +87,12 @@ export default defineConfig4CustomTheme<VdoingThemeConfig>({
           { text: 'Vue项目实战', link: '/pages/f28741/' },
           { text: '从0搭建后台管理系统(Vue2)', link: '/pages/a84d22/' },
           { text: 'Vue3项目实战', link: '/pages/8a69d5/' },
-          { text: '博客项目实战', link: '/pages/9decd4/' }
+          { text: '博客项目实战', link: '/pages/9decd4/' },
+          { text: 'DElement-Ui组件库', link: '/pages/052176/'}
         ],
       },
       {
-        text: '🚀扩展',
+        text: '扩展',
         link: '/extend/',
         items: [
           {
@@ -130,19 +131,11 @@ export default defineConfig4CustomTheme<VdoingThemeConfig>({
         ],
       },
       {
-        text: '📖前端小课程',link: '/course/',
-        items: [
-          { text: '柯里化', link: '/pages/101b26/' }
-        ]
+        text: '📖前端小课程',link: '/course/'
       },
       {
         text: '⭐收藏',
         link: '/pages/beb6c0bd8a66cea6/',
-        // items: [
-        //   { text: '网站', link: '/pages/beb6c0bd8a66cea6/' },
-        //   { text: '资源', link: '/pages/eee83a9211a70f9d/' },
-        //   { text: 'Vue资源', link: '/pages/12df8ace52d493f6/' },
-        // ],
       },
       {
         text: '更多',
@@ -153,9 +146,6 @@ export default defineConfig4CustomTheme<VdoingThemeConfig>({
           { text: '标签', link: '/tags/' },
           { text: '归档', link: '/archives/' },
           { text: '学习', link: '/pages/f2a556/' },
-          { text: '面试', link: '/pages/aea6571b7a8bae86/' },
-          { text: '心情杂货', link: '/pages/2d615df9a36a98ed/' },
-          { text: '实用技巧', link: '/pages/baaa02/' },
           { text: '友情链接', link: '/friends/' },
         ],
       },

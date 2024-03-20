@@ -82,6 +82,8 @@ export default defineConfig4CustomTheme<VdoingThemeConfig>({
         text: '项目实战',
         link: '/item/',
         items: [
+          { text: '静态页面（京东/品优购/唯品会）', link: '/pages/f99783/' },
+          { text: '移动页面（京东/携程/苏宁易购）', link: '/pages/5ba333/' },
           { text: '大屏', link: '/pages/409542/' },
           { text: 'SpringBoot项目', link: '/pages/e9b2d2/' },
           { text: 'Vue项目实战', link: '/pages/f28741/' },

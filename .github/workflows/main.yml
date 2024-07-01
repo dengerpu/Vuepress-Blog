@@ -1,56 +1,24 @@
 # # This is a basic workflow to help you get started with Actions
 
-# name: deploy
-
-# # Controls when the workflow will run
-# on:
-#   # Triggers the workflow on push or pull request events but only for the main branch
-#   push: # push就会触发下面的任务
-#     branches: [ master ] # 哪个分支
-#   # Allows you to run this workflow manually from the Actions tab
-#   workflow_dispatch:
-
-# # A workflow run is made up of one or more jobs that can run sequentially or in parallel
-# jobs:
-#   # This workflow contains a single job called "build"
-#   build:
-#     # The type of runner that the job will run on
-#     runs-on: ubuntu-latest
-#     # Steps represent a sequence of tasks that will be executed as part of the job
-#     steps:
-#       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-#       - uses: actions/checkout@v2
-#       - name: install Node.js # 任务的名字，可任意
-#         uses: actions/setup-node@v2.5.0 # 可以在右边搜
-#         with:
-#           node-version: "18.18.0" # 版本
-#       - name: install dep
-#         run: npm install # 任务运行的命令
-#       - name: build app
-#         run: npm run buildLinux
-#       - name: copy file via ssh password #上传打包后的文件到服务器
-#         uses: appleboy/scp-action@master
-#         with:
-#           host: ${{ secrets.REMOTE_HOST }} # 服务器ip
-#           username: ${{ secrets.REMOTE_USER }} # 服务器账号
-#           password: ${{ secrets.REMOTE_PASS }} # 服务器密码
-#           port: 22 # 端口号
-#           source: "docs/.vuepress/dist/*" # 打包后的文件夹
-#           target: ${{ secrets.REMOTE_TARGET }} # 要上传到的服务器的对应的文件夹
-# 上面为服务器配置方式，由于服务器性能太差，导致自动化部署过程以及上线访问过慢
-
 name: deploy
 
+# Controls when the workflow will run
 on:
-  push:
-    branches:
-      - master
+  # Triggers the workflow on push or pull request events but only for the main branch
+  push: # push就会触发下面的任务
+    branches: [ master ] # 哪个分支
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
 
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
+  # This workflow contains a single job called "build"
   build:
+    # The type of runner that the job will run on
     runs-on: ubuntu-latest
-
+    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
       - name: install Node.js # 任务的名字，可任意
         uses: actions/setup-node@v2.5.0 # 可以在右边搜
@@ -60,12 +28,44 @@ jobs:
         run: npm install # 任务运行的命令
       - name: build app
         run: npm run buildLinux
-
-      - name: Upload COS
-        uses: zkqiang/tencent-cos-action@v0.1.0
+      - name: copy file via ssh password #上传打包后的文件到服务器
+        uses: appleboy/scp-action@master
         with:
-          args: delete -r -f / && upload -r ./docs/.vuepress/dist/ /
-          secret_id: ${{ secrets.TX_OSS_SECRET_ID }}
-          secret_key: ${{ secrets.TX_OSS_SECRET_KEY }}
-          bucket: ${{ secrets.TX_OSS_BUCKET }}
-          region: ap-chongqing
+          host: ${{ secrets.REMOTE_HOST }} # 服务器ip
+          username: ${{ secrets.REMOTE_USER }} # 服务器账号
+          password: ${{ secrets.REMOTE_PASS }} # 服务器密码
+          port: 22 # 端口号
+          source: "docs/.vuepress/dist/*" # 打包后的文件夹
+          target: ${{ secrets.REMOTE_TARGET }} # 要上传到的服务器的对应的文件夹
+# 上面为服务器配置方式，由于服务器性能太差，导致自动化部署过程以及上线访问过慢
+
+# name: deploy
+
+# on:
+#   push:
+#     branches:
+#       - master
+
+# jobs:
+#   build:
+#     runs-on: ubuntu-latest
+
+#     steps:
+#       - uses: actions/checkout@v2
+#       - name: install Node.js # 任务的名字，可任意
+#         uses: actions/setup-node@v2.5.0 # 可以在右边搜
+#         with:
+#           node-version: "18.18.0" # 版本
+#       - name: install dep
+#         run: npm install # 任务运行的命令
+#       - name: build app
+#         run: npm run buildLinux
+
+#       - name: Upload COS
+#         uses: zkqiang/tencent-cos-action@v0.1.0
+#         with:
+#           args: delete -r -f / && upload -r ./docs/.vuepress/dist/ /
+#           secret_id: ${{ secrets.TX_OSS_SECRET_ID }}
+#           secret_key: ${{ secrets.TX_OSS_SECRET_KEY }}
+#           bucket: ${{ secrets.TX_OSS_BUCKET }}
+#           region: ap-chongqing

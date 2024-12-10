@@ -18,7 +18,8 @@ export default defineConfig4CustomTheme<VdoingThemeConfig>({
   locales: {
     '/': {
       lang: 'zh-CN',
-      title: "爱写bug的小邓程序员",
+      // title: "爱写bug的小邓程序员",
+      title: "快乐的小白菜",
       description: 'web前端技术博客,专注web前端学习与总结。',
     }
   },

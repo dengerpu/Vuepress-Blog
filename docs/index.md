@@ -1,8 +1,7 @@
 ---
 home: true
 # heroImage: /img/web.png
-# 爱写bug的小邓程序员
-heroText: 快乐的小白菜
+heroText: 爱写bug的小邓程序员
 tagline: Web前端技术博客，积跬步以至千里，致敬每个爱学习的你。
 actionText: 立刻进入 →
 actionLink: /web/
